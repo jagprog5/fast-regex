@@ -343,8 +343,159 @@ int main(void) {
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("\'");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.error_msg == "literal ended without content");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'a");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.error_msg == "literal ended without closing quote");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'ab");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr + 2);
+    assert_continue(array_output[0].value.error_msg == "expecting end of literal");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'a'");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 = 'a');
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\z");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr + 2);
+    assert_continue(array_output[0].value.error_msg == "invalid escaped character");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\n''\\r''\\xaF''\\x'");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[5];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == '\n');
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[1].begin == expr + 4);
+    assert_continue(array_output[1].value.u32 == '\r');
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[2].begin == expr + 8);
+    assert_continue(array_output[2].value.u32 == 0xAF);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[3].begin == expr + 14);
+    assert_continue(array_output[3].value.u32 == 0);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[4].begin == NULL);
+    assert_continue(array_output[4].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xFFFFFFFFF'"); // overlong
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr + 11);
+    assert_continue(array_output[0].value.error_msg == "expecting end of literal");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xQ'");
+    arith_token_tokenize_arg output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr + 3);
+    assert_continue(array_output[0].value.error_msg == "invalid hex escaped character");
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
   { // test wholistic
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 / -16)");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 / -'a')");
     arith_token_tokenize_arg output_size_arg;
     output_size_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     size_t output_size = 0;
@@ -395,10 +546,10 @@ int main(void) {
 
     assert_continue(array_output[10].type == ARITH_TOKEN_U32);
     assert_continue(array_output[10].begin == expr + 24);
-    assert_continue(array_output[10].value.u32 == 16);
+    assert_continue(array_output[10].value.u32 == 'a');
 
     assert_continue(array_output[11].type == ARITH_TOKEN_RIGHT_BRACKET);
-    assert_continue(array_output[11].begin == expr + 26);
+    assert_continue(array_output[11].begin == expr + 27);
 
     assert_continue(array_output[12].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[12].begin == NULL);

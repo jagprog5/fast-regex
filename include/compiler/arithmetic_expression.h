@@ -163,6 +163,114 @@ main_switch:
           goto main_switch;
         }
       } break;
+      case '\'': {
+        arith_token token;
+        token.begin = begin;
+        ++begin;
+        if (begin == end) {
+          token.type = ARITH_TOKEN_ERROR;
+          token.value.error_msg = "literal ended without content";
+          send_output(&arg, token);
+          goto end;
+        }
+
+        ch = *begin;
+
+        if (ch == '\\') {
+          // escaped character
+          ++begin;
+          if (begin == end) {
+            token.begin = begin;
+            token.type = ARITH_TOKEN_ERROR;
+            token.value.error_msg = "escape character ended without content";
+            send_output(&arg, token);
+            goto end;
+          }
+          ch = *begin;
+          switch (ch) {
+            default:
+              token.begin = begin;
+              token.type = ARITH_TOKEN_ERROR;
+              token.value.error_msg = "invalid escaped character";
+              send_output(&arg, token);
+              goto end;
+              break;
+            case 'a':
+              token.value.u32 = '\a';
+              break;
+            case 'b':
+              token.value.u32 = '\b';
+              break;
+            case 't':
+              token.value.u32 = '\t';
+              break;
+            case 'n':
+              token.value.u32 = '\n';
+              break;
+            case 'v':
+              token.value.u32 = '\v';
+              break;
+            case 'f':
+              token.value.u32 = '\f';
+              break;
+            case 'r':
+              token.value.u32 = '\r';
+              break;
+            case 'e':
+              token.value.u32 = '\e';
+              break;
+            case 'x': {
+              token.value.u32 = 0;
+              for (int i = 0; i < 8; ++i) { // 4 bytes (8 nibbles) in u32
+                ++begin;
+                if (begin == end) {
+                  goto literal_no_close_quote;
+                }
+                ch = *begin;
+                if (ch >= '0' && ch <= '9') {
+                  token.value.u32 <<= 4;
+                  token.value.u32 += ch - '0';
+                } else if (ch >= 'a' && ch <= 'f') {
+                  token.value.u32 <<= 4;
+                  token.value.u32 += (ch - 'a') + 10;
+                } else if (ch >= 'A' && ch <= 'F') {
+                  token.value.u32 <<= 4;
+                  token.value.u32 += (ch - 'A') + 10;
+                } else if (ch == '\'') {
+                  goto past_literal_close_quote;
+                } else {
+                  token.begin = begin;
+                  token.type = ARITH_TOKEN_ERROR;
+                  token.value.error_msg = "invalid hex escaped character";
+                  send_output(&arg, token);
+                  goto end;
+                }
+              }
+            } break;
+          }
+        } else {
+          token.value.u32 = ch;
+        }
+        ++begin;
+        if (begin == end) {
+literal_no_close_quote:
+          token.type = ARITH_TOKEN_ERROR;
+          token.value.error_msg = "literal ended without closing quote";
+          send_output(&arg, token);
+          goto end;
+        }
+        ch = *begin;
+        if (ch != '\'') {
+          token.type = ARITH_TOKEN_ERROR;
+          token.begin = begin;
+          token.value.error_msg = "expecting end of literal";
+          send_output(&arg, token);
+          goto end;
+        }
+past_literal_close_quote:
+        token.type = ARITH_TOKEN_U32;
+        send_output(&arg, token);
+      } break;
       case '0':
       case '1':
       case '2':
@@ -195,25 +303,30 @@ main_switch:
 
           // handle digit
 
-          // checked multiply
-          uint32_t next_value = token.value.u32 * 10;
-          if (next_value < token.value.u32) {
-            goto handle_value_overflow;
+          { // checked multiply
+            uint64_t next_value = token.value.u32;
+            assert(sizeof(next_value) > sizeof(token.value.u32)); // static
+            next_value *= 10;
+            if (next_value > UINT32_MAX) {
+              goto handle_value_overflow;
+            }
+            token.value.u32 = next_value;
           }
-          token.value.u32 = next_value;
 
-          // checked add
-          next_value = token.value.u32 + (ch - '0');
-          if (next_value < token.value.u32) {
+          { // checked add
+            uint32_t next_value = token.value.u32 + (ch - '0');
+            if (next_value < token.value.u32) {
 handle_value_overflow:
-            arith_token err_token;
-            err_token.type = ARITH_TOKEN_ERROR;
-            err_token.begin = token.begin;
-            err_token.value.error_msg = "num too large";
-            send_output(&arg, err_token);
-            goto end;
+              arith_token err_token;
+              err_token.type = ARITH_TOKEN_ERROR;
+              err_token.begin = token.begin;
+              err_token.value.error_msg = "num too large";
+              send_output(&arg, err_token);
+              goto end;
+            }
+            token.value.u32 = next_value;
           }
-          token.value.u32 = next_value;
+
           ++begin;
         }
       } break;
@@ -256,4 +369,3 @@ handle_value_overflow:
 
 end:
 }
-
