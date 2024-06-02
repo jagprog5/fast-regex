@@ -17,14 +17,17 @@ typedef enum {
   ARITH_TOKEN_SUB = '-',
   ARITH_TOKEN_MUL = '*',
   ARITH_TOKEN_DIV = '/',
+  ARITH_TOKEN_MOD = '%',
   ARITH_TOKEN_LEFT_BRACKET = '(',
   ARITH_TOKEN_RIGHT_BRACKET = ')',
   ARITH_TOKEN_XOR = '^',
   ARITH_TOKEN_EQUALITY = '=',
   ARITH_TOKEN_LESS_THAN,          // <
   ARITH_TOKEN_LESS_THAN_EQUAL,    // <=
+  ARITH_TOKEN_LEFT_SHIFT,         // <<
   ARITH_TOKEN_GREATER_THAN,       // >
   ARITH_TOKEN_GREATER_THAN_EQUAL, // >=
+  ARITH_TOKEN_RIGHT_SHIFT,        // >>
   ARITH_TOKEN_BITWISE_AND,        // &
   ARITH_TOKEN_LOGICAL_AND,        // &&
   ARITH_TOKEN_BITWISE_OR,         // |
@@ -46,26 +49,26 @@ typedef struct {
   arith_token_value value;
 } arith_token;
 
-// =============================== arith_token_tokenize_arg ====================
+// =============================== arith_token_tokenize_result ====================
 
 typedef enum { //
   ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY,
   ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY
-} arith_token_tokenize_arg_type;
+} arith_token_tokenize_result_type;
 
 typedef union {
   size_t* capacity;    // ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY
   arith_token* tokens; // ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY
-} arith_token_tokenize_arg_value;
+} arith_token_tokenize_result_value;
 
 typedef struct {
-  arith_token_tokenize_arg_type type;
-  arith_token_tokenize_arg_value value;
-} arith_token_tokenize_arg;
+  arith_token_tokenize_result_type type;
+  arith_token_tokenize_result_value value;
+} arith_token_tokenize_result;
 
 // =========================== functions =======================================
 
-static void send_output(arith_token_tokenize_arg* dst, arith_token token) {
+static void send_output(arith_token_tokenize_result* dst, arith_token token) {
   assert(dst->type == ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY || dst->type == ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY);
   switch (dst->type) {
     case ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY:
@@ -82,7 +85,7 @@ static void send_output(arith_token_tokenize_arg* dst, arith_token token) {
 // use of this function should be completed in two passes.
 //  - the first pass gets the capacity required to store the array of tokens.
 //  - the second pass fills the capacity.
-void tokenize_arithmetic_expression(const CODE_UNIT* begin, const CODE_UNIT* end, arith_token_tokenize_arg arg) {
+void tokenize_arithmetic_expression(const CODE_UNIT* begin, const CODE_UNIT* end, arith_token_tokenize_result arg) {
   assert(begin <= end);
   CODE_UNIT ch;
   while (begin != end) {
@@ -99,6 +102,7 @@ main_switch:
       case '-':
       case '*':
       case '/':
+      case '%':
       case '(':
       case ')':
       case '^':
@@ -125,6 +129,14 @@ main_switch:
         if (ch == '=') {
           // <= found.
           token.type = is_lt ? ARITH_TOKEN_LESS_THAN_EQUAL : ARITH_TOKEN_GREATER_THAN_EQUAL;
+          send_output(&arg, token);
+          // this character is consumed. continue normally in loop
+        } else if (ch == '<' && is_lt) {
+          token.type = ARITH_TOKEN_LEFT_SHIFT;
+          send_output(&arg, token);
+          // this character is consumed. continue normally in loop
+        } else if (ch == '>' && !is_lt) {
+          token.type = ARITH_TOKEN_RIGHT_SHIFT;
           send_output(&arg, token);
           // this character is consumed. continue normally in loop
         } else {

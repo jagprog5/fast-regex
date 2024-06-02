@@ -12,7 +12,7 @@ int main(void) {
   { // basic operators, whitespace ignored
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("+ -\n");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[3];
     memset(array_output, 0, sizeof(array_output));
@@ -32,7 +32,7 @@ int main(void) {
   { // a number which end with the end of the string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("1234");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -50,7 +50,7 @@ int main(void) {
   { // a number which ends for any other reason
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("1234\n\r\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -68,7 +68,7 @@ int main(void) {
   { // maximum value
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("4294967295");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -86,7 +86,7 @@ int main(void) {
   { // overflow from addition in number parse
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("4294967296");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -104,7 +104,7 @@ int main(void) {
   { // overflow from multiply in number parse
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("42949672950");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -122,7 +122,7 @@ int main(void) {
   { // a symbol that ends with the end of the string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("abz9_hello");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -140,7 +140,7 @@ int main(void) {
   { // a symbol that ends for any other reason
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("abz9_hello\n\t\r");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -158,7 +158,7 @@ int main(void) {
   { // invalid character
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("\xFF");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -176,7 +176,7 @@ int main(void) {
   { // < from end of string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("<");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -193,7 +193,7 @@ int main(void) {
   { // < from end of operation
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("<\r\n\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -210,7 +210,7 @@ int main(void) {
   { // <= from end of string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("<=");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -227,7 +227,7 @@ int main(void) {
   { // <= from end of operation
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("<=\n\t\r");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -244,7 +244,7 @@ int main(void) {
   { // >
     const CODE_UNIT* expr = CODE_UNIT_LITERAL(">\r\n\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -261,7 +261,7 @@ int main(void) {
   { // >=
     const CODE_UNIT* expr = CODE_UNIT_LITERAL(">=\r\n\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -275,10 +275,36 @@ int main(void) {
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("<<>><>");
+
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[5];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+    assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_SHIFT);
+    assert_continue(array_output[0].begin == expr);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_RIGHT_SHIFT);
+    assert_continue(array_output[1].begin == expr + 2);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_LESS_THAN);
+    assert_continue(array_output[2].begin == expr + 4);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_GREATER_THAN);
+    assert_continue(array_output[3].begin == expr + 5);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[4].begin == NULL);
+    assert_continue(array_output[4].value.error_msg == NULL);
+  }
   { // & from end of string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("&");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -295,7 +321,7 @@ int main(void) {
   { // & from end of operation
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("&\r\n\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -312,7 +338,7 @@ int main(void) {
   { // && from end of string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("&&");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -329,7 +355,7 @@ int main(void) {
   { // && from end of operation
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("&&\r\n\t");
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -345,7 +371,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("\'");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -362,7 +388,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'a");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -379,7 +405,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'ab");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -396,7 +422,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'a'");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -413,7 +439,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\z");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -430,7 +456,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\n''\\r''\\xaF''\\x'");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[5];
     memset(array_output, 0, sizeof(array_output));
@@ -460,7 +486,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xFFFFFFFFF'"); // overlong
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -478,7 +504,7 @@ int main(void) {
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xQ'");
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
@@ -496,7 +522,7 @@ int main(void) {
   }
   { // test wholistic
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 / -'a')");
-    arith_token_tokenize_arg output_size_arg;
+    arith_token_tokenize_result output_size_arg;
     output_size_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     size_t output_size = 0;
     output_size_arg.value.capacity = &output_size;
@@ -506,7 +532,7 @@ int main(void) {
     arith_token array_output[13];
     memset(array_output, 0, sizeof(array_output));
 
-    arith_token_tokenize_arg output;
+    arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     output.value.tokens = array_output;
     tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
