@@ -40,4 +40,4 @@ build/test/%: build/test/%.o
 .PRECIOUS: build/test/%.o
 
 clean:
-	rm -rv build/*
+	rm -rvf build/*

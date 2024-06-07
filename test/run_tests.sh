@@ -3,7 +3,7 @@
 # this file is invoked by the makefile, after the tests have been built
 
 {
-    err_string=$(find build -type f -executable -print0 | while IFS= read -r -d '' file; do
+    err_string=$(find build/test -type f -executable -print0 | while IFS= read -r -d '' file; do
         $("$file" &> /dev/null)
         if [ $? -eq 0 ]; then
             echo -en "\u2705" # checkmark
