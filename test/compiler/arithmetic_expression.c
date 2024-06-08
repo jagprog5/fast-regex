@@ -19,7 +19,7 @@ int main(void) {
 
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
-    arith_token array_output[5];
+    arith_token array_output[4];
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
@@ -31,16 +31,12 @@ int main(void) {
     assert_continue(array_output[1].type == ARITH_TOKEN_UNARY_ADD);
     assert_continue(array_output[1].begin == expr);
 
-    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[2].type == ARITH_TOKEN_SUB);
     assert_continue(array_output[2].begin == expr + 2);
-    assert_continue(array_output[2].value.u32 == 0);
 
-    assert_continue(array_output[3].type == ARITH_TOKEN_UNARY_SUB);
-    assert_continue(array_output[3].begin == expr + 2);
-
-    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
-    assert_continue(array_output[4].begin == NULL);
-    assert_continue(array_output[4].value.error_msg == NULL);
+    assert_continue(array_output[3].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[3].begin == NULL);
+    assert_continue(array_output[3].value.error_msg == NULL);
   }
   { // a number which end with the end of the string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("1234");
@@ -931,6 +927,111 @@ int main(void) {
     assert_continue(array_output[3].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[3].begin == expr + 2);
     assert_continue(array_output[3].value.error_msg == "expression stack exhausted by op");
+  }
+
+  { // two + is ok (first is binary, second is unary)
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("1 + + 3");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[5];
+    output.value.tokens = array_output;
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 1);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[1].begin == expr + 2);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[2].begin == expr + 4);
+    assert_continue(array_output[2].value.u32 == 0);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_UNARY_ADD);
+    assert_continue(array_output[3].begin == expr + 4);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[4].begin == expr + 6);
+    assert_continue(array_output[4].value.u32 == 3);
+
+    arith_token* end = array_output + sizeof(array_output) / sizeof(arith_token);
+    arith_token* new_end = parse_arithmetic_expression(array_output, end);
+    assert_continue(end == new_end);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 1);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[1].begin == expr + 4);
+    assert_continue(array_output[1].value.u32 == 0);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[2].begin == expr + 6);
+    assert_continue(array_output[2].value.u32 == 3);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[3].begin == expr + 4);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[4].begin == expr + 2);
+  }
+
+  { // three + is not ok 
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("1 + + + 3");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[6];
+    output.value.tokens = array_output;
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 1);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[1].begin == expr + 2);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[2].begin == expr + 4);
+    assert_continue(array_output[2].value.u32 == 0);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_UNARY_ADD);
+    assert_continue(array_output[3].begin == expr + 4);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[4].begin == expr + 6);
+
+    assert_continue(array_output[5].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[5].begin == expr + 8);
+    assert_continue(array_output[5].value.u32 == 3);
+
+    arith_token* end = array_output + sizeof(array_output) / sizeof(arith_token);
+    arith_token* new_end = parse_arithmetic_expression(array_output, end);
+    assert_continue(end == new_end);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 1);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[1].begin == expr + 4);
+    assert_continue(array_output[1].value.u32 == 0);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[2].begin == expr + 4);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[3].begin == expr + 8);
+    assert_continue(array_output[3].value.u32 == 3);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[4].begin == expr + 6);
+
+    assert_continue(array_output[5].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[5].begin == expr + 2);
+    assert_continue(array_output[5].value.error_msg == "expression stack exhausted by op");
   }
 
   return has_errors;

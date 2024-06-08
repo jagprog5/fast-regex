@@ -91,6 +91,9 @@ static void send_output_tokenize(arith_token_tokenize_result* dst, arith_token t
     case ARITH_TOKEN_RIGHT_BRACKET:
     case ARITH_TOKEN_U32:
     case ARITH_TOKEN_SYMBOL:
+    case ARITH_TOKEN_UNARY_ADD:
+    case ARITH_TOKEN_UNARY_SUB:
+    case ARITH_TOKEN_BITWISE_COMPLEMENT:
       *unary_allowed_next = false;
       break;
     default:
