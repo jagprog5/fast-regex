@@ -450,7 +450,7 @@ int main(void) {
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == expr + 2);
-    assert_continue(array_output[1].value.error_msg == "'~' unary operator mustn't be proceeded by a value");
+    assert_continue(array_output[1].value.error_msg == "unary op mustn't follow value");
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == NULL);
@@ -573,10 +573,10 @@ int main(void) {
     assert_continue(array_output[1].value.error_msg == NULL);
   }
   {
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\n''\\r''\\xaF''\\x'");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\n'");
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
-    arith_token array_output[5];
+    arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
@@ -586,21 +586,45 @@ int main(void) {
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == '\n');
 
-    assert_continue(array_output[1].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[1].begin == expr + 4);
-    assert_continue(array_output[1].value.u32 == '\r');
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xaF'");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
 
-    assert_continue(array_output[2].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[2].begin == expr + 8);
-    assert_continue(array_output[2].value.u32 == 0xAF);
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
 
-    assert_continue(array_output[3].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[3].begin == expr + 14);
-    assert_continue(array_output[3].value.u32 == 0);
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 0xAF);
 
-    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
-    assert_continue(array_output[4].begin == NULL);
-    assert_continue(array_output[4].value.error_msg == NULL);
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\x'");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 == 0);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xFFFFFFFFF'"); // overlong
@@ -637,6 +661,100 @@ int main(void) {
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
+  }
+  { // consecutive value from symbol
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'a' tester");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[3];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 = 'a');
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == expr + 4);
+    assert_continue(array_output[1].value.error_msg == "consecutive value now allowed");
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[2].begin == NULL);
+    assert_continue(array_output[2].value.error_msg == NULL);
+  }
+  { // consecutive value from char literal
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("5 'a'");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[3];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 = 5);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == expr + 2);
+    assert_continue(array_output[1].value.error_msg == "consecutive value now allowed");
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[2].begin == NULL);
+    assert_continue(array_output[2].value.error_msg == NULL);
+  }
+  { // consecutive value from begin of expression
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("5 (");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[3];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_U32);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.u32 = 5);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == expr + 2);
+    assert_continue(array_output[1].value.error_msg == "consecutive value now allowed");
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[2].begin == NULL);
+    assert_continue(array_output[2].value.error_msg == NULL);
+  }
+  { // consecutive value from literal number
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(b) 17");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[5];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression(expr, &expr[code_unit_strlen(expr)], output);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_BRACKET);
+    assert_continue(array_output[0].begin == expr);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_SYMBOL);
+    assert_continue(array_output[1].begin == expr + 1);
+    assert_continue(array_output[1].value.symbol_end == expr + 2);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_RIGHT_BRACKET);
+    assert_continue(array_output[2].begin == expr + 2);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[3].begin == expr + 4);
+    assert_continue(array_output[3].value.error_msg == "consecutive value now allowed");
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[4].begin == NULL);
+    assert_continue(array_output[4].value.error_msg == NULL);
   }
   { // test wholistic
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) == (32 / -'a')");
