@@ -130,12 +130,53 @@ static void send_zero_before_unary(arith_token_tokenize_result* dst, arith_token
   send_output_update_state(dst, unary, state);
 }
 
-// split the input into arith_token tokens.
+typedef struct {
+  const CODE_UNIT* begin;
+  const CODE_UNIT* end;
+} arithmetic_expression_symbol;
+
+typedef struct {
+  const arithmetic_expression_symbol* symbols;
+  size_t size;
+} arithmetic_expression_allowed_symbols;
+
+static bool check_symbol_allowed(const CODE_UNIT* symbol_begin, const CODE_UNIT* symbol_end,
+                                arithmetic_expression_allowed_symbols* allowed) {
+    if (allowed == NULL) {
+      return true;
+    }
+    for (size_t i = 0; i < allowed->size; ++i) {
+      arithmetic_expression_symbol allowed_symbol = allowed->symbols[i];
+      
+      size_t length1 = allowed_symbol.end - allowed_symbol.begin;
+      size_t length2 = symbol_end - symbol_begin;
+      if (length1 != length2) {
+        goto try_next_symbol;
+      }
+
+      for (size_t j = 0; j < length1; ++j) {
+        if (allowed_symbol.begin[j] != symbol_begin[j]) {
+          goto try_next_symbol;
+        }
+      }
+
+      return true;
+      try_next_symbol:
+    }
+
+    return false;
+}
+
+// split the input into `arith_token` tokens.
 // use of this function should be completed in two passes.
 //  - the first pass gets the capacity required to store the array of tokens.
-//  - the second pass fills the capacity.
-// unary ops get an imaginary zero before them, so they are now a binary op instead
-void tokenize_arithmetic_expression(const CODE_UNIT* begin, const CODE_UNIT* end, arith_token_tokenize_result arg) {
+//  - the second pass fills the allocation.  
+//
+// unary ops get an imaginary zero before them, so they are now binary ops instead.
+// symbols which aren't specified in `allowed_symbols` throw an error.
+void tokenize_arithmetic_expression_symbols_restricted(const CODE_UNIT* begin, const CODE_UNIT* end,//
+                                                        arith_token_tokenize_result arg,
+                                                        arithmetic_expression_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
   // given the previous token, what is allowed next?
   arithmetic_expression_h_parse_state state;
@@ -483,19 +524,33 @@ handle_value_overflow:
             if (begin == end) {
               // emit symbol, end of string reached
               token.value.symbol_end = begin;
-              send_output_update_state(&arg, token, &state);
+              bool symbol_allowed = check_symbol_allowed(token.begin, token.value.symbol_end, allowed_symbols);
+              if (symbol_allowed) {
+                send_output_update_state(&arg, token, &state);
+              } else {
+                token.type = ARITH_TOKEN_ERROR;
+                token.value.error_msg = "invalid symbol";
+                send_output(&arg, token);
+              }
               goto end;
             }
             ch = *begin;
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_')) {
               // emit symbol, end of symbol reached
               token.value.symbol_end = begin;
-              send_output_update_state(&arg, token, &state);
-              goto begin_iter;
+              bool symbol_allowed = check_symbol_allowed(token.begin, token.value.symbol_end, allowed_symbols);
+              if (symbol_allowed) {
+                send_output_update_state(&arg, token, &state);
+                goto begin_iter;
+              } else {
+                token.type = ARITH_TOKEN_ERROR;
+                token.value.error_msg = "invalid symbol";
+                send_output(&arg, token);
+                goto end;
+              }
             }
             ++begin;
           }
-
         } else {
           arith_token token;
           token.type = ARITH_TOKEN_ERROR;
@@ -509,6 +564,13 @@ handle_value_overflow:
     ++begin;
   }
 end:
+}
+
+// forward overload.
+// same as `tokenize_arithmetic_expression_symbols_restricted`,
+// except any symbol name is allowed
+void tokenize_arithmetic_expression(const CODE_UNIT* begin, const CODE_UNIT* end, arith_token_tokenize_result arg) {
+  tokenize_arithmetic_expression_symbols_restricted(begin, end, arg, NULL);
 }
 
 // all operations are left to right associative

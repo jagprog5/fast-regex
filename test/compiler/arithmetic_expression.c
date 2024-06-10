@@ -165,7 +165,7 @@ int main(void) {
     assert_continue(array_output[1].value.error_msg == NULL);
   }
   { // invalid character
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("\xFF");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("@ 123");
 
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
@@ -707,7 +707,7 @@ int main(void) {
     assert_continue(array_output[2].value.error_msg == NULL);
   }
   { // consecutive value from begin of expression
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("5 (");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("5 (stuff)");
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[3];
@@ -727,6 +727,71 @@ int main(void) {
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == NULL);
     assert_continue(array_output[2].value.error_msg == NULL);
+  }
+  { // invalid symbol emitted from end of string
+    arithmetic_expression_symbol allowed_symbol_arr[2];
+    allowed_symbol_arr[0].begin = CODE_UNIT_LITERAL("abc");
+    allowed_symbol_arr[0].end = allowed_symbol_arr[0].begin + code_unit_strlen(allowed_symbol_arr[0].begin);
+    allowed_symbol_arr[1].begin = CODE_UNIT_LITERAL("test");
+    allowed_symbol_arr[1].end = allowed_symbol_arr[1].begin + code_unit_strlen(allowed_symbol_arr[1].begin);
+
+    arithmetic_expression_allowed_symbols allowed_symbols;
+    allowed_symbols.size = sizeof(allowed_symbol_arr) / sizeof(arithmetic_expression_symbol);
+    allowed_symbols.symbols = allowed_symbol_arr;
+
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("abc + test + blah");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[6];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression_symbols_restricted(expr, &expr[code_unit_strlen(expr)], output, &allowed_symbols);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_SYMBOL);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.symbol_end == expr + 3);
+
+    assert_continue(array_output[1].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[1].begin == expr + 4);
+
+    assert_continue(array_output[2].type == ARITH_TOKEN_SYMBOL);
+    assert_continue(array_output[2].begin == expr + 6);
+    assert_continue(array_output[2].value.symbol_end == expr + 10);
+
+    assert_continue(array_output[3].type == ARITH_TOKEN_ADD);
+    assert_continue(array_output[3].begin == expr + 11);
+
+    assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[4].begin == expr + 13);
+    assert_continue(array_output[4].value.error_msg == "invalid symbol");
+    
+    assert_continue(array_output[5].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[5].begin == NULL);
+    assert_continue(array_output[5].value.error_msg == NULL);
+  }
+  { // invalid symbol typical
+    arithmetic_expression_symbol allowed_symbol_arr[0];
+    arithmetic_expression_allowed_symbols allowed_symbols;
+    allowed_symbols.size = sizeof(allowed_symbol_arr) / sizeof(arithmetic_expression_symbol);
+    allowed_symbols.symbols = allowed_symbol_arr;
+
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("blah");
+    arith_token_tokenize_result output;
+    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+    output.value.tokens = array_output;
+
+    tokenize_arithmetic_expression_symbols_restricted(expr, &expr[code_unit_strlen(expr)], output, &allowed_symbols);
+
+    assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[0].begin == expr);
+    assert_continue(array_output[0].value.error_msg == "invalid symbol");
+    
+    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
+    assert_continue(array_output[1].begin == NULL);
+    assert_continue(array_output[1].value.error_msg == NULL);
   }
   { // consecutive value from literal number
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("(b) 17");
