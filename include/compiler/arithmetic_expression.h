@@ -6,9 +6,6 @@
 
 #include "code_unit.h"
 
-// =============================================================================
-// ================================ tokenizer ==================================
-
 // ============================== arith_token ==================================
 
 typedef enum {
@@ -41,7 +38,7 @@ typedef enum {
 } arith_token_type;
 
 typedef union {
-  uint32_t u32;                // ARITH_TOKEN_U32
+  uint_fast32_t u32;           // ARITH_TOKEN_U32. will NEVER exceed UINT32_MAX
   const CODE_UNIT* symbol_end; // ARITH_TOKEN_SYMBOL
   const char* error_msg;       // ARITH_TOKEN_ERROR
 } arith_token_value;
@@ -140,43 +137,45 @@ typedef struct {
   size_t size;
 } arithmetic_expression_allowed_symbols;
 
-static bool check_symbol_allowed(const CODE_UNIT* symbol_begin, const CODE_UNIT* symbol_end,
-                                arithmetic_expression_allowed_symbols* allowed) {
-    if (allowed == NULL) {
-      return true;
+static bool check_symbol_allowed(const CODE_UNIT* symbol_begin,
+                                 const CODE_UNIT* symbol_end, //
+                                 arithmetic_expression_allowed_symbols* allowed) {
+  if (allowed == NULL) {
+    return true;
+  }
+  for (size_t i = 0; i < allowed->size; ++i) {
+    arithmetic_expression_symbol allowed_symbol = allowed->symbols[i];
+
+    size_t length1 = allowed_symbol.end - allowed_symbol.begin;
+    size_t length2 = symbol_end - symbol_begin;
+    if (length1 != length2) {
+      goto try_next_symbol;
     }
-    for (size_t i = 0; i < allowed->size; ++i) {
-      arithmetic_expression_symbol allowed_symbol = allowed->symbols[i];
-      
-      size_t length1 = allowed_symbol.end - allowed_symbol.begin;
-      size_t length2 = symbol_end - symbol_begin;
-      if (length1 != length2) {
+
+    for (size_t j = 0; j < length1; ++j) {
+      if (allowed_symbol.begin[j] != symbol_begin[j]) {
         goto try_next_symbol;
       }
-
-      for (size_t j = 0; j < length1; ++j) {
-        if (allowed_symbol.begin[j] != symbol_begin[j]) {
-          goto try_next_symbol;
-        }
-      }
-
-      return true;
-      try_next_symbol:
     }
 
-    return false;
+    return true;
+try_next_symbol:
+  }
+
+  return false;
 }
 
 // split the input into `arith_token` tokens.
 // use of this function should be completed in two passes.
 //  - the first pass gets the capacity required to store the array of tokens.
-//  - the second pass fills the allocation.  
+//  - the second pass fills the allocation.
 //
 // unary ops get an imaginary zero before them, so they are now binary ops instead.
 // symbols which aren't specified in `allowed_symbols` throw an error.
-void tokenize_arithmetic_expression_symbols_restricted(const CODE_UNIT* begin, const CODE_UNIT* end,//
-                                                        arith_token_tokenize_result arg,
-                                                        arithmetic_expression_allowed_symbols* allowed_symbols) {
+void tokenize_arithmetic_expression_symbols_restricted(const CODE_UNIT* begin,
+                                                       const CODE_UNIT* end, //
+                                                       arith_token_tokenize_result arg,
+                                                       arithmetic_expression_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
   // given the previous token, what is allowed next?
   arithmetic_expression_h_parse_state state;
@@ -390,7 +389,7 @@ simple_token:
               break;
             case 'x': {
               token.value.u32 = 0;
-              for (int i = 0; i < 8; ++i) { // 4 bytes (8 nibbles) in u32
+              for (size_t i = 0; i < 8; ++i) { // 4 bytes (8 nibbles) in u32
                 ++begin;
                 if (begin == end) {
                   goto literal_no_close_quote;
@@ -438,6 +437,7 @@ literal_no_close_quote:
         }
 past_literal_close_quote:
         token.type = ARITH_TOKEN_U32;
+        assert(token.value.u32 <= UINT32_MAX);
         send_output_update_state(&arg, token, &state);
       } break;
       case '0':
@@ -462,6 +462,7 @@ past_literal_close_quote:
         token.value.u32 = ch - '0';
         ++begin;
         while (1) {
+          assert(token.value.u32 <= UINT32_MAX);
           if (begin == end) {
             // end of number from end of string
             send_output_update_state(&arg, token, &state);
@@ -477,20 +478,20 @@ past_literal_close_quote:
           }
 
           // handle digit
+          // token_value is a u32 proxy for token.value.u32
+          uint32_t token_value = token.value.u32;
 
           { // checked multiply
-            uint64_t next_value = token.value.u32;
-            assert(sizeof(next_value) > sizeof(token.value.u32)); // static
-            next_value *= 10;
-            if (next_value > UINT32_MAX) {
+            uint32_t next_value = 10 * token_value;
+            if (next_value / 10 != token_value) {
               goto handle_value_overflow;
             }
-            token.value.u32 = next_value;
+            token_value = next_value;
           }
 
           { // checked add
-            uint32_t next_value = token.value.u32 + (ch - '0');
-            if (next_value < token.value.u32) {
+            uint32_t next_value = token_value + (ch - '0');
+            if (next_value < token_value) {
 handle_value_overflow:
               arith_token err_token;
               err_token.type = ARITH_TOKEN_ERROR;
@@ -499,9 +500,9 @@ handle_value_overflow:
               send_output(&arg, err_token);
               goto end;
             }
-            token.value.u32 = next_value;
+            token_value = next_value;
           }
-
+          token.value.u32 = token_value;
           ++begin;
         }
       } break;
