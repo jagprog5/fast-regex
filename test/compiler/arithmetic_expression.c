@@ -1,6 +1,3 @@
-#include <string.h>
-#include <uchar.h>
-
 #define USE_WCHAR
 
 #include "arithmetic_expression.h"
@@ -8,8 +5,17 @@
 #include "test_common.h"
 extern int has_errors;
 
-int main(void) {
+// helper for testing
+void token_exp_no_sym(const CODE_UNIT* begin, //
+                      const CODE_UNIT* end,
+                      arith_token_tokenize_result arg) {
+  arith_expr_allowed_symbols allowed_symbols;
+  allowed_symbols.size = 0;
+  allowed_symbols.symbols = NULL;
+  tokenize_arithmetic_expression(begin, end, arg, &allowed_symbols);
+}
 
+int main(void) {
   // ===========================================================================
   // =============================== tokenization test =========================
   // ===========================================================================
@@ -19,7 +25,8 @@ int main(void) {
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     output.value.capacity = NULL;
-    tokenize_arithmetic_expression(expr, expr, output);
+
+    token_exp_no_sym(expr, expr, output);
   }
   { // basic operators, whitespace ignored. unary has additional zeros inserted
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("+ -\n");
@@ -30,7 +37,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 0);
@@ -54,7 +61,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 1234);
@@ -72,7 +79,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 1234);
@@ -90,7 +97,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 4294967295);
@@ -108,10 +115,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "num too large"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "num too large"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -126,10 +133,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "num too large"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "num too large"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -144,10 +151,17 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    arith_expr_symbol one_symbol;
+    one_symbol.begin = expr;
+    one_symbol.end = expr + code_unit_strlen(expr);
+    arith_expr_allowed_symbols allowed_symbols;
+    allowed_symbols.size = 1;
+    allowed_symbols.symbols = &one_symbol;
+
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
     assert_continue(array_output[0].type == ARITH_TOKEN_SYMBOL);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(array_output[0].value.symbol_end == expr + code_unit_strlen(expr));
+    assert_continue(array_output[0].value.symbol_value_lookup == 0);
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -162,10 +176,17 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    arith_expr_symbol one_symbol;
+    one_symbol.begin = expr;
+    one_symbol.end = expr + 10;
+    arith_expr_allowed_symbols allowed_symbols;
+    allowed_symbols.size = 1;
+    allowed_symbols.symbols = &one_symbol;
+
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
     assert_continue(array_output[0].type == ARITH_TOKEN_SYMBOL);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(array_output[0].value.symbol_end == expr + (code_unit_strlen(expr) - 3));
+    assert_continue(array_output[0].value.symbol_value_lookup == 0);
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -180,10 +201,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "invalid unit in arith expr"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "invalid unit in arith expr"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -198,7 +219,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LESS_THAN);
     assert_continue(array_output[0].begin == expr);
 
@@ -215,7 +236,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LESS_THAN);
     assert_continue(array_output[0].begin == expr);
 
@@ -232,7 +253,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LESS_THAN_EQUAL);
     assert_continue(array_output[0].begin == expr);
 
@@ -249,7 +270,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LESS_THAN_EQUAL);
     assert_continue(array_output[0].begin == expr);
 
@@ -266,7 +287,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_GREATER_THAN);
     assert_continue(array_output[0].begin == expr);
 
@@ -283,7 +304,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_GREATER_THAN_EQUAL);
     assert_continue(array_output[0].begin == expr);
 
@@ -300,7 +321,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_SHIFT);
     assert_continue(array_output[0].begin == expr);
 
@@ -326,7 +347,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_BITWISE_AND);
     assert_continue(array_output[0].begin == expr);
 
@@ -343,7 +364,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_BITWISE_AND);
     assert_continue(array_output[0].begin == expr);
 
@@ -360,7 +381,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LOGICAL_AND);
     assert_continue(array_output[0].begin == expr);
 
@@ -377,7 +398,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LOGICAL_AND);
     assert_continue(array_output[0].begin == expr);
 
@@ -394,10 +415,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "operator incomplete from end of string"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete from end of string"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -412,10 +433,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "operator incomplete"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -430,7 +451,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_NOT_EQUAL);
     assert_continue(array_output[0].begin == expr);
 
@@ -450,7 +471,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 15);
@@ -472,7 +493,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_BRACKET);
     assert_continue(array_output[0].begin == expr);
 
@@ -502,10 +523,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "literal ended without content"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "literal ended without content"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -519,10 +540,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "literal ended without closing quote"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "literal ended without closing quote"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -536,10 +557,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "expecting end of literal"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "expecting end of literal"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -553,7 +574,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
     assert_continue(array_output[0].value.u32 == 'a');
@@ -570,10 +591,10 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "invalid escaped character"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "invalid escaped character"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -587,7 +608,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -605,7 +626,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -623,7 +644,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -641,11 +662,11 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr + 11);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "expecting end of literal"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "expecting end of literal"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -659,11 +680,11 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr + 3);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "invalid hex escaped character"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "invalid hex escaped character"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
@@ -677,7 +698,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -685,7 +706,7 @@ int main(void) {
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == expr + 4);
-    assert_continue(0==strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
+    assert_continue(0 == strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == NULL);
@@ -699,7 +720,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -707,7 +728,7 @@ int main(void) {
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
+    assert_continue(0 == strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == NULL);
@@ -721,7 +742,7 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -729,20 +750,20 @@ int main(void) {
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
+    assert_continue(0 == strcmp(array_output[1].value.error_msg, "consecutive value now allowed"));
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == NULL);
     assert_continue(array_output[2].value.error_msg == NULL);
   }
   { // invalid symbol emitted from end of string
-    arithmetic_expression_symbol allowed_symbol_arr[2];
+    arith_expr_symbol allowed_symbol_arr[2];
     allowed_symbol_arr[0].begin = CODE_UNIT_LITERAL("abc");
     allowed_symbol_arr[0].end = allowed_symbol_arr[0].begin + code_unit_strlen(allowed_symbol_arr[0].begin);
     allowed_symbol_arr[1].begin = CODE_UNIT_LITERAL("test");
     allowed_symbol_arr[1].end = allowed_symbol_arr[1].begin + code_unit_strlen(allowed_symbol_arr[1].begin);
 
-    arithmetic_expression_allowed_symbols allowed_symbols;
+    arith_expr_allowed_symbols allowed_symbols;
     allowed_symbols.size = sizeof(allowed_symbol_arr) / sizeof(*allowed_symbol_arr);
     allowed_symbols.symbols = allowed_symbol_arr;
 
@@ -753,33 +774,33 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression_symbols_restricted(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_SYMBOL);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(array_output[0].value.symbol_end == expr + 3);
+    assert_continue(array_output[0].value.symbol_value_lookup == 0);
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ADD);
     assert_continue(array_output[1].begin == expr + 4);
 
     assert_continue(array_output[2].type == ARITH_TOKEN_SYMBOL);
     assert_continue(array_output[2].begin == expr + 6);
-    assert_continue(array_output[2].value.symbol_end == expr + 10);
+    assert_continue(array_output[2].value.symbol_value_lookup == 1);
 
     assert_continue(array_output[3].type == ARITH_TOKEN_ADD);
     assert_continue(array_output[3].begin == expr + 11);
 
     assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[4].begin == expr + 13);
-    assert_continue(0==strcmp(array_output[4].value.error_msg, "invalid symbol"));
-    
+    assert_continue(0 == strcmp(array_output[4].value.error_msg, "invalid symbol"));
+
     assert_continue(array_output[5].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[5].begin == NULL);
     assert_continue(array_output[5].value.error_msg == NULL);
   }
   { // invalid symbol typical
-    arithmetic_expression_symbol allowed_symbol_arr[0];
-    arithmetic_expression_allowed_symbols allowed_symbols;
+    arith_expr_symbol allowed_symbol_arr[0];
+    arith_expr_allowed_symbols allowed_symbols;
     allowed_symbols.size = sizeof(allowed_symbol_arr) / sizeof(*allowed_symbol_arr);
     allowed_symbols.symbols = allowed_symbol_arr;
 
@@ -790,39 +811,39 @@ int main(void) {
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression_symbols_restricted(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0==strcmp(array_output[0].value.error_msg, "invalid symbol"));
-    
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "invalid symbol"));
+
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
   { // consecutive value from literal number
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(b) 17");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(1) 17");
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[5];
     memset(array_output, 0, sizeof(array_output));
     output.value.tokens = array_output;
 
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_BRACKET);
     assert_continue(array_output[0].begin == expr);
 
-    assert_continue(array_output[1].type == ARITH_TOKEN_SYMBOL);
+    assert_continue(array_output[1].type == ARITH_TOKEN_U32);
     assert_continue(array_output[1].begin == expr + 1);
-    assert_continue(array_output[1].value.symbol_end == expr + 2);
+    assert_continue(array_output[1].value.u32 == 1);
 
     assert_continue(array_output[2].type == ARITH_TOKEN_RIGHT_BRACKET);
     assert_continue(array_output[2].begin == expr + 2);
 
     assert_continue(array_output[3].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[3].begin == expr + 4);
-    assert_continue(0==strcmp(array_output[3].value.error_msg, "consecutive value now allowed"));
+    assert_continue(0 == strcmp(array_output[3].value.error_msg, "consecutive value now allowed"));
 
     assert_continue(array_output[4].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[4].begin == NULL);
@@ -834,7 +855,15 @@ int main(void) {
     output_size_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     size_t output_size = 0;
     output_size_arg.value.capacity = &output_size;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output_size_arg);
+
+    arith_expr_symbol one_symbol;
+    one_symbol.begin = CODE_UNIT_LITERAL("variable");
+    one_symbol.end = one_symbol.begin + code_unit_strlen(one_symbol.begin);
+    arith_expr_allowed_symbols allowed_symbols;
+    allowed_symbols.size = 1;
+    allowed_symbols.symbols = &one_symbol;
+
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output_size_arg, &allowed_symbols);
     assert_continue(output_size == 13);
 
     arith_token array_output[output_size + 1];
@@ -844,14 +873,14 @@ int main(void) {
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output, &allowed_symbols);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_BRACKET);
     assert_continue(array_output[0].begin == expr);
 
     assert_continue(array_output[1].type == ARITH_TOKEN_SYMBOL);
     assert_continue(array_output[1].begin == expr + 1);
-    assert_continue(array_output[1].value.symbol_end == expr + 9);
+    assert_continue(array_output[1].value.symbol_value_lookup == 0);
 
     assert_continue(array_output[2].type == ARITH_TOKEN_BITWISE_AND);
     assert_continue(array_output[2].begin == expr + 10);
@@ -911,7 +940,7 @@ int main(void) {
     output_size_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     size_t output_size = 0;
     output_size_arg.value.capacity = &output_size;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output_size_arg);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output_size_arg);
     assert_continue(output_size == 11);
 
     arith_token array_output[output_size];
@@ -921,7 +950,7 @@ int main(void) {
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     arith_token* new_end = parse_arithmetic_expression(array_output, array_output + output_size);
 
@@ -966,7 +995,7 @@ int main(void) {
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[3];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_LEFT_BRACKET);
     assert_continue(array_output[0].begin == expr);
@@ -991,7 +1020,7 @@ int main(void) {
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == expr);
-    assert_continue(0==strcmp(array_output[2].value.error_msg, "no matching right bracket"));
+    assert_continue(0 == strcmp(array_output[2].value.error_msg, "no matching right bracket"));
   }
 
   { // missing (
@@ -1000,7 +1029,7 @@ int main(void) {
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[3];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -1025,7 +1054,7 @@ int main(void) {
 
     assert_continue(array_output[2].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[2].begin == expr + 5);
-    assert_continue(0==strcmp(array_output[2].value.error_msg, "no matching left bracket"));
+    assert_continue(0 == strcmp(array_output[2].value.error_msg, "no matching left bracket"));
   }
 
   { // unary op parse
@@ -1034,7 +1063,7 @@ int main(void) {
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[5];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -1083,7 +1112,7 @@ int main(void) {
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[4];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -1116,7 +1145,7 @@ int main(void) {
 
     assert_continue(array_output[3].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[3].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[3].value.error_msg, "expression stack exhausted by op"));
+    assert_continue(0 == strcmp(array_output[3].value.error_msg, "expression stack exhausted by op"));
   }
 
   { // two + is ok (first is binary, second is unary)
@@ -1125,7 +1154,7 @@ int main(void) {
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[5];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -1166,15 +1195,19 @@ int main(void) {
 
     assert_continue(array_output[4].type == ARITH_TOKEN_ADD);
     assert_continue(array_output[4].begin == expr + 2);
+
+    arith_token_validate_result validation = validate_arithmetic_expression(array_output, new_end, expr);
+    assert_continue(validation.error_msg == NULL);
+    assert_continue(validation.expression_offset == 0);
   }
 
-  { // three + is not ok 
+  { // three + is not ok
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("1 + + + 3");
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
     arith_token array_output[6];
     output.value.tokens = array_output;
-    tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
 
     assert_continue(array_output[0].type == ARITH_TOKEN_U32);
     assert_continue(array_output[0].begin == expr);
@@ -1221,7 +1254,11 @@ int main(void) {
 
     assert_continue(array_output[5].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[5].begin == expr + 2);
-    assert_continue(0==strcmp(array_output[5].value.error_msg, "expression stack exhausted by op"));
+    assert_continue(0 == strcmp(array_output[5].value.error_msg, "expression stack exhausted by op"));
+
+    arith_token_validate_result validation = validate_arithmetic_expression(array_output, new_end, expr);
+    assert_continue(validation.error_msg == "expression stack exhausted by op");
+    assert_continue(validation.expression_offset == 2);
   }
 
   return has_errors;

@@ -38,16 +38,16 @@ typedef enum {
 } arith_token_type;
 
 typedef union {
-  uint_fast32_t u32;           // ARITH_TOKEN_U32. will NEVER exceed UINT32_MAX
-  const CODE_UNIT* symbol_end; // ARITH_TOKEN_SYMBOL
-  const char* error_msg;       // ARITH_TOKEN_ERROR
+  uint_fast32_t u32;          // ARITH_TOKEN_U32. will NEVER exceed UINT32_MAX
+  size_t symbol_value_lookup; // ARITH_TOKEN_SYMBOL. index of allowed symbol
+  const char* error_msg;      // ARITH_TOKEN_ERROR
 } arith_token_value;
 
 // token variant. token are created from an input string
 typedef struct {
   arith_token_type type;
-  const CODE_UNIT* begin;
   arith_token_value value;
+  const CODE_UNIT* begin;
 } arith_token;
 
 // ============================ arith_token_tokenize_result ====================
@@ -70,13 +70,13 @@ typedef struct {
 // =========================== functions =======================================
 
 static void send_output(arith_token_tokenize_result* dst, arith_token token) {
-  assert(dst->type == ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY || dst->type == ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY);
   switch (dst->type) {
     case ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY:
       (*dst->value.capacity) += 1;
       break;
     case ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY:
     default:
+      assert(dst->type == ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY);
       *dst->value.tokens++ = token;
       break;
   }
@@ -88,7 +88,9 @@ typedef struct {
   bool value_allowed_next;
 } arithmetic_expression_h_parse_state;
 
-static void send_output_update_state(arith_token_tokenize_result* dst, arith_token token, arithmetic_expression_h_parse_state* state) {
+static void send_output_update_state(arith_token_tokenize_result* dst, //
+                                     arith_token token,
+                                     arithmetic_expression_h_parse_state* state) {
   send_output(dst, token);
   switch (token.type) {
     case ARITH_TOKEN_RIGHT_BRACKET:
@@ -118,7 +120,9 @@ static void send_output_update_state(arith_token_tokenize_result* dst, arith_tok
 
 // send a 0 before send_output_update_state.
 // the shunting yard method can't handle unary, so all unary is converted to a binary op
-static void send_zero_before_unary(arith_token_tokenize_result* dst, arith_token unary, arithmetic_expression_h_parse_state* state) {
+static void send_zero_before_unary(arith_token_tokenize_result* dst, //
+                                   arith_token unary,
+                                   arithmetic_expression_h_parse_state* state) {
   arith_token zero;
   zero.type = ARITH_TOKEN_U32;
   zero.begin = unary.begin;
@@ -130,21 +134,19 @@ static void send_zero_before_unary(arith_token_tokenize_result* dst, arith_token
 typedef struct {
   const CODE_UNIT* begin;
   const CODE_UNIT* end;
-} arithmetic_expression_symbol;
+} arith_expr_symbol;
 
 typedef struct {
-  const arithmetic_expression_symbol* symbols;
+  const arith_expr_symbol* symbols;
   size_t size;
-} arithmetic_expression_allowed_symbols;
+} arith_expr_allowed_symbols;
 
-static bool check_symbol_allowed(const CODE_UNIT* symbol_begin,
-                                 const CODE_UNIT* symbol_end, //
-                                 arithmetic_expression_allowed_symbols* allowed) {
-  if (allowed == NULL) {
-    return true;
-  }
+// -1 if not in allowed symbols
+static size_t get_arith_expr_allowed_symbol_index(const CODE_UNIT* symbol_begin, //
+                                                  const CODE_UNIT* symbol_end,
+                                                  arith_expr_allowed_symbols* allowed) {
   for (size_t i = 0; i < allowed->size; ++i) {
-    arithmetic_expression_symbol allowed_symbol = allowed->symbols[i];
+    arith_expr_symbol allowed_symbol = allowed->symbols[i];
 
     size_t length1 = allowed_symbol.end - allowed_symbol.begin;
     size_t length2 = symbol_end - symbol_begin;
@@ -158,11 +160,10 @@ static bool check_symbol_allowed(const CODE_UNIT* symbol_begin,
       }
     }
 
-    return true;
+    return i;
 try_next_symbol:
   }
-
-  return false;
+  return -1;
 }
 
 // split the input into `arith_token` tokens.
@@ -172,10 +173,10 @@ try_next_symbol:
 //
 // unary ops get an imaginary zero before them, so they are now binary ops instead.
 // symbols which aren't specified in `allowed_symbols` throw an error.
-void tokenize_arithmetic_expression_symbols_restricted(const CODE_UNIT* begin,
-                                                       const CODE_UNIT* end, //
-                                                       arith_token_tokenize_result arg,
-                                                       arithmetic_expression_allowed_symbols* allowed_symbols) {
+void tokenize_arithmetic_expression(const CODE_UNIT* begin,
+                                    const CODE_UNIT* end, //
+                                    arith_token_tokenize_result arg,
+                                    arith_expr_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
   // given the previous token, what is allowed next?
   arithmetic_expression_h_parse_state state;
@@ -524,9 +525,9 @@ handle_value_overflow:
           while (1) {
             if (begin == end) {
               // emit symbol, end of string reached
-              token.value.symbol_end = begin;
-              bool symbol_allowed = check_symbol_allowed(token.begin, token.value.symbol_end, allowed_symbols);
-              if (symbol_allowed) {
+              size_t symbol_index = get_arith_expr_allowed_symbol_index(token.begin, begin, allowed_symbols);
+              if (symbol_index != -1) {
+                token.value.symbol_value_lookup = symbol_index;
                 send_output_update_state(&arg, token, &state);
               } else {
                 token.type = ARITH_TOKEN_ERROR;
@@ -538,9 +539,9 @@ handle_value_overflow:
             ch = *begin;
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_')) {
               // emit symbol, end of symbol reached
-              token.value.symbol_end = begin;
-              bool symbol_allowed = check_symbol_allowed(token.begin, token.value.symbol_end, allowed_symbols);
-              if (symbol_allowed) {
+              size_t symbol_index = get_arith_expr_allowed_symbol_index(token.begin, begin, allowed_symbols);
+              if (symbol_index != -1) {
+                token.value.symbol_value_lookup = symbol_index;
                 send_output_update_state(&arg, token, &state);
                 goto begin_iter;
               } else {
@@ -565,13 +566,6 @@ handle_value_overflow:
     ++begin;
   }
 end:
-}
-
-// forward overload.
-// same as `tokenize_arithmetic_expression_symbols_restricted`,
-// except any symbol name is allowed
-void tokenize_arithmetic_expression(const CODE_UNIT* begin, const CODE_UNIT* end, arith_token_tokenize_result arg) {
-  tokenize_arithmetic_expression_symbols_restricted(begin, end, arg, NULL);
 }
 
 // all operations are left to right associative
@@ -763,10 +757,41 @@ arith_token* parse_arithmetic_expression(arith_token* begin, arith_token* end) {
     }
     ++begin;
   }
+  assert(stack_size == 1);
 
 end:
 
   assert(write_pos >= begin_copy);
   assert(write_pos <= end);
   return write_pos;
+}
+
+// error_msg is null on no error
+typedef struct {
+  const char* error_msg;
+  size_t expression_offset; // offset within the arithmetic expression
+} arith_token_validate_result;
+
+// indicates if an error exists in the arithmetic expression
+arith_token_validate_result validate_arithmetic_expression(const arith_token* parsed_begin, //
+                                                           const arith_token* parsed_end,
+                                                           const CODE_UNIT* expression_begin) {
+  arith_token_validate_result ret;
+  assert(parsed_begin <= parsed_end);
+  ret.expression_offset = 0;
+  if (parsed_begin == parsed_end) {
+    ret.error_msg = "empty expression not allowed";
+    goto end;
+  }
+  ret.error_msg = NULL;
+  while (parsed_begin != parsed_end) {
+    arith_token t = *parsed_begin++;
+    if (t.type == ARITH_TOKEN_ERROR) {
+      ret.error_msg = t.value.error_msg;
+      ret.expression_offset = t.begin - expression_begin;
+      goto end;
+    }
+  }
+end:
+  return ret;
 }
