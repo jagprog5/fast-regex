@@ -12,7 +12,7 @@ uint_fast32_t interpret_arithmetic_expression(const arith_token* begin, const ar
   size_t input_size = end - begin;
   uint_fast32_t stack[input_size];
   uint_fast32_t* stack_top = stack;
-  while (begin != end) {
+  do {
     arith_token t = *begin;
     switch (t.type) {
       case ARITH_TOKEN_U32:
@@ -75,21 +75,15 @@ uint_fast32_t interpret_arithmetic_expression(const arith_token* begin, const ar
           case ARITH_TOKEN_BITWISE_AND:
             *result = lhs & rhs;
             break;
-          case ARITH_TOKEN_LOGICAL_AND:
-            *result = lhs && rhs;
-            break;
-          case ARITH_TOKEN_BITWISE_OR:
-            *result = lhs | rhs;
-            break;
-          case ARITH_TOKEN_LOGICAL_OR:
           default:
-            assert(t.type == ARITH_TOKEN_LOGICAL_OR);
-            *result = lhs || rhs;
+          case ARITH_TOKEN_BITWISE_OR:
+            assert(t.type == ARITH_TOKEN_BITWISE_OR);
+            *result = lhs | rhs;
             break;
         }
       } break;
     }
     ++begin;
-  }
+  } while (begin != end);
   return stack_top[-1];
 }

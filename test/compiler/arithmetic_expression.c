@@ -372,8 +372,8 @@ int main(void) {
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
-  { // == fail from end of string
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("=");
+  { // != fail from end of string
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("!");
 
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
@@ -384,14 +384,14 @@ int main(void) {
     token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete from end of string"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete (!=) from end of string"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
-  { // == fail
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("=5");
+  { // != fail
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("!5");
 
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
@@ -402,14 +402,14 @@ int main(void) {
     token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
     assert_continue(array_output[0].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[0].begin == expr);
-    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete"));
+    assert_continue(0 == strcmp(array_output[0].value.error_msg, "operator incomplete (!=)"));
 
     assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
   {
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("!===");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("!==");
 
     arith_token_tokenize_result output;
     output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
@@ -816,7 +816,7 @@ int main(void) {
     assert_continue(array_output[4].value.error_msg == NULL);
   }
   { // test wholistic
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) == (32 / -'a')");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 / -'a')");
     arith_token_tokenize_result output_size_arg;
     output_size_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
     size_t output_size = 0;
@@ -862,28 +862,28 @@ int main(void) {
     assert_continue(array_output[5].begin == expr + 15);
 
     assert_continue(array_output[6].type == ARITH_TOKEN_LEFT_BRACKET);
-    assert_continue(array_output[6].begin == expr + 18);
+    assert_continue(array_output[6].begin == expr + 17);
 
     assert_continue(array_output[7].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[7].begin == expr + 19);
+    assert_continue(array_output[7].begin == expr + 18);
     assert_continue(array_output[7].value.u32 == 32);
 
     assert_continue(array_output[8].type == ARITH_TOKEN_DIV);
-    assert_continue(array_output[8].begin == expr + 22);
+    assert_continue(array_output[8].begin == expr + 21);
 
     assert_continue(array_output[9].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[9].begin == expr + 24);
+    assert_continue(array_output[9].begin == expr + 23);
     assert_continue(array_output[9].value.u32 == 0);
 
     assert_continue(array_output[10].type == ARITH_TOKEN_UNARY_SUB);
-    assert_continue(array_output[10].begin == expr + 24);
+    assert_continue(array_output[10].begin == expr + 23);
 
     assert_continue(array_output[11].type == ARITH_TOKEN_U32);
-    assert_continue(array_output[11].begin == expr + 25);
+    assert_continue(array_output[11].begin == expr + 24);
     assert_continue(array_output[11].value.u32 == 'a');
 
     assert_continue(array_output[12].type == ARITH_TOKEN_RIGHT_BRACKET);
-    assert_continue(array_output[12].begin == expr + 28);
+    assert_continue(array_output[12].begin == expr + 27);
 
     assert_continue(array_output[13].type == ARITH_TOKEN_ERROR);
     assert_continue(array_output[13].begin == NULL);

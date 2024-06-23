@@ -20,16 +20,16 @@ typedef enum {
   ARITH_TOKEN_BITWISE_XOR = '^',
   ARITH_TOKEN_BITWISE_AND = '&',
   ARITH_TOKEN_BITWISE_OR = '|',
-  ARITH_TOKEN_BITWISE_COMPLEMENT, // only unary
-  ARITH_TOKEN_EQUAL,              // ==
-  ARITH_TOKEN_NOT_EQUAL,          // !=
-  ARITH_TOKEN_LESS_THAN,          // <
-  ARITH_TOKEN_LESS_THAN_EQUAL,    // <=
-  ARITH_TOKEN_LEFT_SHIFT,         // <<
-  ARITH_TOKEN_GREATER_THAN,       // >
-  ARITH_TOKEN_GREATER_THAN_EQUAL, // >=
-  ARITH_TOKEN_RIGHT_SHIFT,        // >>
-  ARITH_TOKEN_U32,                // u32 is the max size of CODE_UNIT
+  ARITH_TOKEN_EQUAL = '=',               // =
+  ARITH_TOKEN_BITWISE_COMPLEMENT = 0x80, // only unary. enum values continue past ascii
+  ARITH_TOKEN_NOT_EQUAL,                 // !=
+  ARITH_TOKEN_LESS_THAN,                 // <
+  ARITH_TOKEN_LESS_THAN_EQUAL,           // <=
+  ARITH_TOKEN_LEFT_SHIFT,                // <<
+  ARITH_TOKEN_GREATER_THAN,              // >
+  ARITH_TOKEN_GREATER_THAN_EQUAL,        // >=
+  ARITH_TOKEN_RIGHT_SHIFT,               // >>
+  ARITH_TOKEN_U32,                       // u32 is the max size of CODE_UNIT
   ARITH_TOKEN_SYMBOL,
   ARITH_TOKEN_UNARY_ADD = -ARITH_TOKEN_ADD,
   ARITH_TOKEN_UNARY_SUB = -ARITH_TOKEN_SUB,
@@ -231,8 +231,9 @@ begin_iter:
       case '%':
       case ')':
       case '^':
-      case '&': 
-      case '|': {
+      case '&':
+      case '|':
+      case '=': {
 simple_token:
         arith_token token;
         token.begin = begin;
@@ -273,26 +274,24 @@ simple_token:
           goto begin_iter;
         }
       } break;
-      case '=':
       case '!': {
-        bool maybe_equality = ch == '=';
         arith_token token;
         token.begin = begin;
         ++begin;
         if (begin == end) {
           token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "operator incomplete from end of string";
+          token.value.error_msg = "operator incomplete (!=) from end of string";
           send_output(&arg, token);
           goto end;
         }
         ch = *begin;
         if (ch == '=') {
-          token.type = maybe_equality ? ARITH_TOKEN_EQUAL : ARITH_TOKEN_NOT_EQUAL;
+          token.type = ARITH_TOKEN_NOT_EQUAL;
           send_output_update_state(&arg, token, &state);
           // this character is consumed. continue normally in loop
         } else {
           token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "operator incomplete";
+          token.value.error_msg = "operator incomplete (!=)";
           send_output(&arg, token);
           goto end;
         }
@@ -731,9 +730,8 @@ end:
   return write_pos;
 }
 
-// error_msg is null on no error
 typedef struct {
-  const char* error_msg;
+  const char* error_msg; // null on no error
   size_t expression_offset; // offset within the arithmetic expression
 } arith_token_validate_result;
 
