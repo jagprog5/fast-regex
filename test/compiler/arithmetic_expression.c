@@ -372,40 +372,6 @@ int main(void) {
     assert_continue(array_output[1].begin == NULL);
     assert_continue(array_output[1].value.error_msg == NULL);
   }
-  { // && from end of string
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("&&");
-
-    arith_token_tokenize_result output;
-    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
-    arith_token array_output[2];
-    memset(array_output, 0, sizeof(array_output));
-    output.value.tokens = array_output;
-
-    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
-    assert_continue(array_output[0].type == ARITH_TOKEN_LOGICAL_AND);
-    assert_continue(array_output[0].begin == expr);
-
-    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
-    assert_continue(array_output[1].begin == NULL);
-    assert_continue(array_output[1].value.error_msg == NULL);
-  }
-  { // && from end of operation
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("&&\r\n\t");
-
-    arith_token_tokenize_result output;
-    output.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
-    arith_token array_output[2];
-    memset(array_output, 0, sizeof(array_output));
-    output.value.tokens = array_output;
-
-    token_exp_no_sym(expr, expr + code_unit_strlen(expr), output);
-    assert_continue(array_output[0].type == ARITH_TOKEN_LOGICAL_AND);
-    assert_continue(array_output[0].begin == expr);
-
-    assert_continue(array_output[1].type == ARITH_TOKEN_ERROR);
-    assert_continue(array_output[1].begin == NULL);
-    assert_continue(array_output[1].value.error_msg == NULL);
-  }
   { // == fail from end of string
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("=");
 

@@ -96,49 +96,60 @@ void* compile(const char* c_compiler_path, const char* program_begin, const char
     }
 
     // copy required since args are non const
-    const char* const const_args[] = {// first arg always is self
-                                      c_compiler_path,
-                                      // don't use temp files during compilation; pipes instead
-                                      "-pipe",
-                                      // shouldn't be needed, but just to be safe. the code shouldn't be
-                                      // moved from the memory file after it is written.
-                                      "-fPIC",
-                                      // shared object (resolve symbols)
-                                      "-shared",
-                                      // optimize a good amount (priority is for fast runtime)
-                                      "-O2",
-                                      // stdin contains c language
-                                      "-xc",
-                                      // write compiled shared object to memory file
-                                      compile_output_file_arg,
-                                      // no files to compile will be specified. only stdin
-                                      "-",
-                                      // execl args are null terminating
-                                      (char*)NULL};
+    char* args[9];
 
-    // TODO
+    // first arg always is self
+    const char* arg0_const = c_compiler_path;
+    size_t arg0_size = strlen(arg0_const) + 1;
+    char arg0[arg0_size];
+    memcpy(arg0, arg0_const, arg0_size);
+    args[0] = arg0;
 
-    const char* const args[] = {// first arg always is self
-                                c_compiler_path,
-                                // don't use temp files during compilation; pipes instead
-                                "-pipe",
-                                // shouldn't be needed, but just to be safe. the code shouldn't be
-                                // moved from the memory file after it is written.
-                                "-fPIC",
-                                // shared object (resolve symbols)
-                                "-shared",
-                                // optimize a good amount (priority is for fast runtime)
-                                "-O2",
-                                // stdin contains c language
-                                "-xc",
-                                // write compiled shared object to memory file
-                                compile_output_file_arg,
-                                // no files to compile will be specified. only stdin
-                                "-",
-                                // execl args are null terminating
-                                (char*)NULL};
+    // don't use temp files during compilation; pipes instead
+    const char* arg1_const = "-pipe";
+    size_t arg1_size = strlen(arg1_const) + 1;
+    char arg1[arg1_size];
+    memcpy(arg1, arg1_const, arg1_size);
+    args[1] = arg1;
+
+    // shouldn't be needed, but just to be safe. the code shouldn't be
+    // moved from the memory file after it is written.
+    const char* arg2_const = "-fPIC";
+    size_t arg2_size = strlen(arg2_const) + 1;
+    char arg2[arg2_size];
+    memcpy(arg2, arg2_const, arg2_size);
+    args[2] = arg2;
+
+    const char* arg3_const = "-shared"; // shared object (resolve symbols)
+    size_t arg3_size = strlen(arg3_const) + 1;
+    char arg3[arg3_size];
+    memcpy(arg3, arg3_const, arg3_size);
+    args[3] = arg3;
+
+    const char* arg4_const = "-O2"; // optimize a good amount (priority is for fast runtime)
+    size_t arg4_size = strlen(arg4_const) + 1;
+    char arg4[arg4_size];
+    memcpy(arg4, arg4_const, arg4_size);
+    args[4] = arg4;
+
+    const char* arg5_const = "-xc"; // stdin contains c language
+    size_t arg5_size = strlen(arg5_const) + 1;
+    char arg5[arg5_size];
+    memcpy(arg5, arg5_const, arg5_size);
+    args[5] = arg5;
+
+    args[6] = compile_output_file_arg; // write compiled shared object to memory file
+
+    const char* arg7_const = "-"; // no further files to compile will be specified. only stdin
+    size_t arg7_size = strlen(arg7_const) + 1;
+    char arg7[arg7_size];
+    memcpy(arg7, arg7_const, arg7_size);
+    args[7] = arg7;
+
+    args[8] = (char*)NULL; // execl args are null terminating
+
     // execvp does not modify the arg elements. even through args elems are non const
-    execvp(c_compiler_path, (char* const*)args);
+    execvp(c_compiler_path, args);
     perror("execl");    // only reached on error
     exit(EXIT_FAILURE); // in child process - exit now
     // all other fds will be closed by OS on child process exit.

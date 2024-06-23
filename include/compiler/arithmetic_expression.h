@@ -18,6 +18,8 @@ typedef enum {
   ARITH_TOKEN_LEFT_BRACKET = '(',
   ARITH_TOKEN_RIGHT_BRACKET = ')',
   ARITH_TOKEN_BITWISE_XOR = '^',
+  ARITH_TOKEN_BITWISE_AND = '&',
+  ARITH_TOKEN_BITWISE_OR = '|',
   ARITH_TOKEN_BITWISE_COMPLEMENT, // only unary
   ARITH_TOKEN_EQUAL,              // ==
   ARITH_TOKEN_NOT_EQUAL,          // !=
@@ -27,10 +29,6 @@ typedef enum {
   ARITH_TOKEN_GREATER_THAN,       // >
   ARITH_TOKEN_GREATER_THAN_EQUAL, // >=
   ARITH_TOKEN_RIGHT_SHIFT,        // >>
-  ARITH_TOKEN_BITWISE_AND,        // &
-  ARITH_TOKEN_LOGICAL_AND,        // &&
-  ARITH_TOKEN_BITWISE_OR,         // |
-  ARITH_TOKEN_LOGICAL_OR,         // ||
   ARITH_TOKEN_U32,                // u32 is the max size of CODE_UNIT
   ARITH_TOKEN_SYMBOL,
   ARITH_TOKEN_UNARY_ADD = -ARITH_TOKEN_ADD,
@@ -232,7 +230,9 @@ begin_iter:
       case '/':
       case '%':
       case ')':
-      case '^': {
+      case '^':
+      case '&': 
+      case '|': {
 simple_token:
         arith_token token;
         token.begin = begin;
@@ -295,35 +295,6 @@ simple_token:
           token.value.error_msg = "operator incomplete";
           send_output(&arg, token);
           goto end;
-        }
-      } break;
-      case '&':
-      case '|': {
-        bool is_and = ch == '&';
-        arith_token token;
-        token.begin = begin;
-        ++begin;
-        if (begin == end) {
-          // end of operation from end of string
-          token.type = is_and ? ARITH_TOKEN_BITWISE_AND : ARITH_TOKEN_BITWISE_OR;
-          send_output_update_state(&arg, token, &state);
-          goto end;
-        }
-
-        ch = *begin;
-        if (is_and && ch == '&') {
-          token.type = ARITH_TOKEN_LOGICAL_AND;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
-        } else if (!is_and && ch == '|') {
-          token.type = ARITH_TOKEN_LOGICAL_OR;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
-        } else {
-          // end of operation since next character gives something else
-          token.type = is_and ? ARITH_TOKEN_BITWISE_AND : ARITH_TOKEN_BITWISE_OR;
-          send_output_update_state(&arg, token, &state);
-          goto begin_iter;
         }
       } break;
       case '\'': {
@@ -609,15 +580,9 @@ static unsigned int operation_precedence(arith_token_type type) {
       break;
     case ARITH_TOKEN_EQUAL:
     case ARITH_TOKEN_NOT_EQUAL:
-      return 9;
-      break;
-    case ARITH_TOKEN_LOGICAL_AND:
-      return 10;
-      break;
-    case ARITH_TOKEN_LOGICAL_OR:
     default:
-      assert(type == ARITH_TOKEN_LOGICAL_OR);
-      return 11;
+      assert(type == ARITH_TOKEN_EQUAL || type == ARITH_TOKEN_NOT_EQUAL);
+      return 9;
       break;
   }
 }
