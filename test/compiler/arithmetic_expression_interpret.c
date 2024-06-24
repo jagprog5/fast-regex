@@ -6,25 +6,24 @@
 extern int has_errors;
 
 uint_fast32_t run_test(const CODE_UNIT* expr_begin, const CODE_UNIT* expr_end, arith_expr_allowed_symbols* allowed_symbols, const uint_fast32_t* symbol_values) {
-  arith_token_tokenize_result output_arg;
-  output_arg.type = ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY;
-  size_t output_size = 0;
-  output_arg.value.capacity = &output_size;
   // tokenize first pass - get output size
-  tokenize_arithmetic_expression(expr_begin, expr_end, output_arg, allowed_symbols);
+  arith_tokenize_capacity cap = tokenize_arithmetic_expression(expr_begin, expr_end, NULL, allowed_symbols);
+  assert_continue(cap.type == ARITH_TOKENIZE_CAPACITY_OK);
 
-  arith_token array_output[output_size];
-  output_arg.type = ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY;
-  output_arg.value.tokens = array_output;
+  union {
+    arith_token tokens[cap.value.capacity];
+    arith_parsed parsed[cap.value.capacity];
+  } array_output;
+
   // tokenize second pass, fill output tokens
-  tokenize_arithmetic_expression(expr_begin, expr_end, output_arg, allowed_symbols);
-  // parse the tokens
-  arith_token* array_output_end = parse_arithmetic_expression(array_output, array_output + output_size);
-  // any errors?
-  arith_token_validate_result validation = validate_arithmetic_expression(array_output, array_output_end, expr_begin);
-  assert_continue(validation.error_msg == NULL);
-  // interpret it
-  return interpret_arithmetic_expression(array_output, array_output_end, symbol_values);
+  { arith_tokenize_capacity ret = tokenize_arithmetic_expression(expr_begin, expr_end, array_output.tokens, allowed_symbols); }
+
+  // ret depends on the lifetime of array_output.parsed
+  arith_expr_result ret = parse_arithmetic_expression(array_output.tokens, array_output.tokens + cap.value.capacity, array_output.parsed);
+
+  assert_continue(ret.type == ARITH_EXPR_OK);
+
+  return interpret_arithmetic_expression(ret.value.expr, symbol_values);
 }
 
 uint_fast32_t run_test_no_vars(const CODE_UNIT* expr_begin, const CODE_UNIT* expr_end) {
@@ -46,6 +45,10 @@ int main(void) {
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("~1");
     assert_continue(~(uint_fast32_t)1 == run_test_no_vars(expr, expr + code_unit_strlen(expr)));
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("3");
+    assert_continue(3 == run_test_no_vars(expr, expr + code_unit_strlen(expr)));
   }
   {
     const CODE_UNIT* first_str = CODE_UNIT_LITERAL("first");

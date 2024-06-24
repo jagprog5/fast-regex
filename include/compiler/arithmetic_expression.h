@@ -5,80 +5,74 @@
 #include <stdint.h>
 
 #include "code_unit.h"
+#include "likely_unlikely.hpp"
 
 // ============================== arith_token ==================================
 
+// token variant. token are created from an input string
 typedef enum {
-  ARITH_TOKEN_ERROR,
-  ARITH_TOKEN_ADD = '+', // binary op
-  ARITH_TOKEN_SUB = '-', // binary op
-  ARITH_TOKEN_MUL = '*',
-  ARITH_TOKEN_DIV = '/',
-  ARITH_TOKEN_MOD = '%',
-  ARITH_TOKEN_LEFT_BRACKET = '(',
-  ARITH_TOKEN_RIGHT_BRACKET = ')',
-  ARITH_TOKEN_BITWISE_XOR = '^',
-  ARITH_TOKEN_BITWISE_AND = '&',
-  ARITH_TOKEN_BITWISE_OR = '|',
-  ARITH_TOKEN_EQUAL = '=',               // =
-  ARITH_TOKEN_BITWISE_COMPLEMENT = 0x80, // only unary. enum values continue past ascii
-  ARITH_TOKEN_NOT_EQUAL,                 // !=
-  ARITH_TOKEN_LESS_THAN,                 // <
-  ARITH_TOKEN_LESS_THAN_EQUAL,           // <=
-  ARITH_TOKEN_LEFT_SHIFT,                // <<
-  ARITH_TOKEN_GREATER_THAN,              // >
-  ARITH_TOKEN_GREATER_THAN_EQUAL,        // >=
-  ARITH_TOKEN_RIGHT_SHIFT,               // >>
-  ARITH_TOKEN_U32,                       // u32 is the max size of CODE_UNIT
-  ARITH_TOKEN_SYMBOL,
-  ARITH_TOKEN_UNARY_ADD = -ARITH_TOKEN_ADD,
-  ARITH_TOKEN_UNARY_SUB = -ARITH_TOKEN_SUB,
-} arith_token_type;
+  ARITH_INVALID = 0, // never used outside testing
+  ARITH_ADD = '+',   // binary op
+  ARITH_SUB = '-',   // binary op
+  ARITH_MUL = '*',
+  ARITH_DIV = '/',
+  ARITH_MOD = '%',
+  ARITH_LEFT_BRACKET = '(',
+  ARITH_RIGHT_BRACKET = ')',
+  ARITH_BITWISE_XOR = '^',
+  ARITH_BITWISE_AND = '&',
+  ARITH_BITWISE_OR = '|',
+  ARITH_EQUAL = '=',               // =
+  ARITH_BITWISE_COMPLEMENT = 0x80, // only unary. enum values continue past ascii
+  ARITH_NOT_EQUAL,                 // !=
+  ARITH_LESS_THAN,                 // <
+  ARITH_LESS_THAN_EQUAL,           // <=
+  ARITH_LEFT_SHIFT,                // <<
+  ARITH_GREATER_THAN,              // >
+  ARITH_GREATER_THAN_EQUAL,        // >=
+  ARITH_RIGHT_SHIFT,               // >>
+  ARITH_U32,                       // u32 is the max size of CODE_UNIT
+  ARITH_SYMBOL,
+  ARITH_UNARY_ADD = -ARITH_ADD,
+  ARITH_UNARY_SUB = -ARITH_SUB,
+} arith_type;
 
 typedef union {
-  uint_fast32_t u32;          // ARITH_TOKEN_U32. will NEVER exceed UINT32_MAX
-  size_t symbol_value_lookup; // ARITH_TOKEN_SYMBOL. index of allowed symbol
-  const char* error_msg;      // ARITH_TOKEN_ERROR
-} arith_token_value;
+  uint_fast32_t u32;          // ARITH_U32. will NEVER exceed UINT32_MAX
+  size_t symbol_value_lookup; // ARITH_SYMBOL. index of allowed symbol
+} arith_value;
 
-// token variant. token are created from an input string
 typedef struct {
-  arith_token_type type;
-  arith_token_value value;
-  const CODE_UNIT* begin;
+  arith_type type;
+  arith_value value;
+  // used for diagnostic information on error
+  size_t offset;
 } arith_token;
 
-// ============================ arith_token_tokenize_result ====================
+// ======================== arith_tokenize_capacity ======================
 
-typedef enum { //
-  ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY,
-  ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY
-} arith_token_tokenize_result_type;
-
-typedef union {
-  size_t* capacity;    // ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY
-  arith_token* tokens; // ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY
-} arith_token_tokenize_result_value;
+typedef enum {
+  ARITH_TOKENIZE_FILL_ARRAY = 0, // indicates that the value should be ignored
+  ARITH_TOKENIZE_CAPACITY_ERROR,
+  ARITH_TOKENIZE_CAPACITY_OK,
+} arith_tokenize_capacity_type;
 
 typedef struct {
-  arith_token_tokenize_result_type type;
-  arith_token_tokenize_result_value value;
-} arith_token_tokenize_result;
+  size_t offset;
+  const char* reason;
+} arith_tokenize_capacity_error;
+
+typedef union {
+  size_t capacity;                   // ARITH_TOKENIZE_CAPACITY_OK
+  arith_tokenize_capacity_error err; // ARITH_TOKENIZE_CAPACITY_ERROR
+} arith_tokenize_capacity_value;
+
+typedef struct {
+  arith_tokenize_capacity_type type;
+  arith_tokenize_capacity_value value;
+} arith_tokenize_capacity;
 
 // =========================== functions =======================================
-
-static void send_output(arith_token_tokenize_result* dst, arith_token token) {
-  switch (dst->type) {
-    case ARITH_TOKEN_TOKENIZE_ARG_GET_CAPACITY:
-      (*dst->value.capacity) += 1;
-      break;
-    case ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY:
-    default:
-      assert(dst->type == ARITH_TOKEN_TOKENIZE_ARG_FILL_ARRAY);
-      *dst->value.tokens++ = token;
-      break;
-  }
-}
 
 // private
 typedef struct {
@@ -86,17 +80,23 @@ typedef struct {
   bool value_allowed_next;
 } arithmetic_expression_h_parse_state;
 
-static void send_output_update_state(arith_token_tokenize_result* dst, //
-                                     arith_token token,
-                                     arithmetic_expression_h_parse_state* state) {
-  send_output(dst, token);
+static void send_output(arith_token** output,
+                        arith_tokenize_capacity* dst, //
+                        arith_token token,
+                        arithmetic_expression_h_parse_state* state) {
+  if (*output == NULL) {
+    dst->value.capacity += 1;
+  } else {
+    *(*output)++ = token;
+  }
+
   switch (token.type) {
-    case ARITH_TOKEN_RIGHT_BRACKET:
-    case ARITH_TOKEN_U32:
-    case ARITH_TOKEN_SYMBOL:
-    case ARITH_TOKEN_UNARY_ADD:
-    case ARITH_TOKEN_UNARY_SUB:
-    case ARITH_TOKEN_BITWISE_COMPLEMENT:
+    case ARITH_RIGHT_BRACKET:
+    case ARITH_U32:
+    case ARITH_SYMBOL:
+    case ARITH_UNARY_ADD:
+    case ARITH_UNARY_SUB:
+    case ARITH_BITWISE_COMPLEMENT:
       state->unary_allowed_next = false;
       break;
     default:
@@ -105,9 +105,9 @@ static void send_output_update_state(arith_token_tokenize_result* dst, //
   }
 
   switch (token.type) {
-    case ARITH_TOKEN_RIGHT_BRACKET:
-    case ARITH_TOKEN_U32:
-    case ARITH_TOKEN_SYMBOL:
+    case ARITH_RIGHT_BRACKET:
+    case ARITH_U32:
+    case ARITH_SYMBOL:
       state->value_allowed_next = false;
       break;
     default:
@@ -116,17 +116,24 @@ static void send_output_update_state(arith_token_tokenize_result* dst, //
   }
 }
 
-// send a 0 before send_output_update_state.
+// send a 0 before sending the token to the output.
 // the shunting yard method can't handle unary, so all unary is converted to a binary op
-static void send_zero_before_unary(arith_token_tokenize_result* dst, //
-                                   arith_token unary,
-                                   arithmetic_expression_h_parse_state* state) {
+static void send_output_zero_before_unary(arith_token** output,
+                                          arith_tokenize_capacity* dst, //
+                                          arith_token unary,
+                                          arithmetic_expression_h_parse_state* state) {
   arith_token zero;
-  zero.type = ARITH_TOKEN_U32;
-  zero.begin = unary.begin;
+  zero.type = ARITH_U32;
+  zero.offset = unary.offset;
   zero.value.u32 = 0;
-  send_output(dst, zero);
-  send_output_update_state(dst, unary, state);
+
+  if (*output == NULL) {
+    dst->value.capacity += 1;
+  } else {
+    *(*output)++ = zero;
+  }
+
+  send_output(output, dst, unary, state);
 }
 
 typedef struct {
@@ -167,19 +174,33 @@ try_next_symbol:
 // split the input into `arith_token` tokens.
 // use of this function should be completed in two passes.
 //  - the first pass gets the capacity required to store the array of tokens.
+//    this is represented by passing NULL the output arg.
+//    in this case, the returned value should be inspected for the result
 //  - the second pass fills the allocation.
-//
+//    this is represented with a non NULL output arg
+//    in this case, the returned value is meaningless
 // unary ops get an imaginary zero before them, so they are now binary ops instead.
 // symbols which aren't specified in `allowed_symbols` throw an error.
-void tokenize_arithmetic_expression(const CODE_UNIT* begin,
-                                    const CODE_UNIT* end, //
-                                    arith_token_tokenize_result arg,
-                                    arith_expr_allowed_symbols* allowed_symbols) {
+arith_tokenize_capacity tokenize_arithmetic_expression(const CODE_UNIT* begin,
+                                                       const CODE_UNIT* end, //
+                                                       arith_token* output,
+                                                       arith_expr_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
   // given the previous token, what is allowed next?
   arithmetic_expression_h_parse_state state;
   state.unary_allowed_next = true;
   state.value_allowed_next = true;
+
+  arith_tokenize_capacity ret;
+  if (output == NULL) {
+    ret.type = ARITH_TOKENIZE_CAPACITY_OK;
+    ret.value.capacity = 0;
+  } else {
+    memset(&ret, 0, sizeof(ret));
+    ret.type = ARITH_TOKENIZE_FILL_ARRAY; // intentional redundant
+  }
+
+  const CODE_UNIT* const original_begin = begin; // for offset calculation
 
   while (begin != end) {
     CODE_UNIT ch = *begin;
@@ -198,30 +219,28 @@ begin_iter:
         }
         // unary op found
         arith_token token;
-        token.begin = begin;
-        token.type = ch == '+' ? ARITH_TOKEN_UNARY_ADD : ARITH_TOKEN_UNARY_SUB;
-        send_zero_before_unary(&arg, token, &state);
+        token.offset = begin - original_begin;
+        token.type = ch == '+' ? ARITH_UNARY_ADD : ARITH_UNARY_SUB;
+        send_output_zero_before_unary(&output, &ret, token, &state);
       } break;
       case '~': {
         arith_token token;
-        token.begin = begin;
-        if (!state.unary_allowed_next) {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "unary op mustn't follow value";
-          send_output(&arg, token);
+        token.offset = begin - original_begin;
+        if (unlikely(!state.unary_allowed_next)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "unary op mustn't follow value";
+          ret.value.err.offset = token.offset;
           goto end;
         } else {
-          token.type = ARITH_TOKEN_BITWISE_COMPLEMENT;
-          send_zero_before_unary(&arg, token, &state);
+          token.type = ARITH_BITWISE_COMPLEMENT;
+          send_output_zero_before_unary(&output, &ret, token, &state);
         }
       } break;
       case '(': {
-        if (!state.value_allowed_next) {
-          arith_token token;
-          token.begin = begin;
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "consecutive value now allowed";
-          send_output(&arg, token);
+        if (unlikely(!state.value_allowed_next)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "consecutive value not allowed";
+          ret.value.err.offset = begin - original_begin;
           goto end;
         }
         goto simple_token;
@@ -236,80 +255,80 @@ begin_iter:
       case '=': {
 simple_token:
         arith_token token;
-        token.begin = begin;
-        token.type = (arith_token_type)ch;
-        send_output_update_state(&arg, token, &state);
+        token.offset = begin - original_begin;
+        token.type = (arith_type)ch;
+        send_output(&output, &ret, token, &state);
       } break;
       case '<':
       case '>': {
         bool is_lt = ch == '<';
         arith_token token;
-        token.begin = begin;
+        token.offset = begin - original_begin;
         ++begin;
         if (begin == end) {
           // end of operation from end of string
-          token.type = is_lt ? ARITH_TOKEN_LESS_THAN : ARITH_TOKEN_GREATER_THAN;
-          send_output_update_state(&arg, token, &state);
+          token.type = is_lt ? ARITH_LESS_THAN : ARITH_GREATER_THAN;
+          send_output(&output, &ret, token, &state);
           goto end;
         }
 
         ch = *begin;
         if (ch == '=') {
           // <= found.
-          token.type = is_lt ? ARITH_TOKEN_LESS_THAN_EQUAL : ARITH_TOKEN_GREATER_THAN_EQUAL;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
+          token.type = is_lt ? ARITH_LESS_THAN_EQUAL : ARITH_GREATER_THAN_EQUAL;
+          send_output(&output, &ret, token, &state);
+          // this character is consumed.
         } else if (ch == '<' && is_lt) {
-          token.type = ARITH_TOKEN_LEFT_SHIFT;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
+          token.type = ARITH_LEFT_SHIFT;
+          send_output(&output, &ret, token, &state);
+          // this character is consumed.
         } else if (ch == '>' && !is_lt) {
-          token.type = ARITH_TOKEN_RIGHT_SHIFT;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
+          token.type = ARITH_RIGHT_SHIFT;
+          send_output(&output, &ret, token, &state);
+          // this character is consumed.
         } else {
           // end of operation since next character gives something else
-          token.type = is_lt ? ARITH_TOKEN_LESS_THAN : ARITH_TOKEN_GREATER_THAN;
-          send_output_update_state(&arg, token, &state);
+          token.type = is_lt ? ARITH_LESS_THAN : ARITH_GREATER_THAN;
+          send_output(&output, &ret, token, &state);
           goto begin_iter;
         }
       } break;
       case '!': {
         arith_token token;
-        token.begin = begin;
+        token.offset = begin - original_begin;
         ++begin;
-        if (begin == end) {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "operator incomplete (!=) from end of string";
-          send_output(&arg, token);
+        if (unlikely(begin == end)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "operator incomplete (!=) from end of string";
+          ret.value.err.offset = token.offset;
           goto end;
         }
         ch = *begin;
-        if (ch == '=') {
-          token.type = ARITH_TOKEN_NOT_EQUAL;
-          send_output_update_state(&arg, token, &state);
-          // this character is consumed. continue normally in loop
+        if (likely(ch == '=')) {
+          token.type = ARITH_NOT_EQUAL;
+          send_output(&output, &ret, token, &state);
+          // this character is consumed.
         } else {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "operator incomplete (!=)";
-          send_output(&arg, token);
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "operator incomplete (!=)";
+          ret.value.err.offset = token.offset;
           goto end;
         }
       } break;
       case '\'': {
         arith_token token;
-        token.begin = begin;
-        if (!state.value_allowed_next) {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "consecutive value now allowed";
-          send_output(&arg, token);
+        token.offset = begin - original_begin;
+        if (unlikely(!state.value_allowed_next)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "consecutive value not allowed";
+          ret.value.err.offset = token.offset;
           goto end;
         }
         ++begin;
-        if (begin == end) {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "literal ended without content";
-          send_output(&arg, token);
+        if (unlikely(begin == end)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "literal ended without content";
+          ret.value.err.offset = token.offset;
           goto end;
         }
 
@@ -318,20 +337,18 @@ simple_token:
         if (ch == '\\') {
           // escaped character
           ++begin;
-          if (begin == end) {
-            token.begin = begin;
-            token.type = ARITH_TOKEN_ERROR;
-            token.value.error_msg = "escape character ended without content";
-            send_output(&arg, token);
+          if (unlikely(begin == end)) {
+            ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+            ret.value.err.reason = "escape character ended without content";
+            ret.value.err.offset = token.offset;
             goto end;
           }
           ch = *begin;
           switch (ch) {
             default:
-              token.begin = begin;
-              token.type = ARITH_TOKEN_ERROR;
-              token.value.error_msg = "invalid escaped character";
-              send_output(&arg, token);
+              ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+              ret.value.err.reason = "invalid escaped character";
+              ret.value.err.offset = begin - original_begin;
               goto end;
               break;
             case 'a':
@@ -378,10 +395,9 @@ simple_token:
                 } else if (ch == '\'') {
                   goto past_literal_close_quote;
                 } else {
-                  token.begin = begin;
-                  token.type = ARITH_TOKEN_ERROR;
-                  token.value.error_msg = "invalid hex escaped character";
-                  send_output(&arg, token);
+                  ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+                  ret.value.err.reason = "invalid hex escaped character";
+                  ret.value.err.offset = begin - original_begin;
                   goto end;
                 }
               }
@@ -391,25 +407,24 @@ simple_token:
           token.value.u32 = ch;
         }
         ++begin;
-        if (begin == end) {
+        if (unlikely(begin == end)) {
 literal_no_close_quote:
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "literal ended without closing quote";
-          send_output(&arg, token);
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "literal ended without closing quote";
+          ret.value.err.offset = token.offset;
           goto end;
         }
         ch = *begin;
         if (ch != '\'') {
-          token.type = ARITH_TOKEN_ERROR;
-          token.begin = begin;
-          token.value.error_msg = "expecting end of literal";
-          send_output(&arg, token);
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "expecting end of literal";
+          ret.value.err.offset = begin - original_begin;
           goto end;
         }
 past_literal_close_quote:
-        token.type = ARITH_TOKEN_U32;
+        token.type = ARITH_U32;
         assert(token.value.u32 <= UINT32_MAX);
-        send_output_update_state(&arg, token, &state);
+        send_output(&output, &ret, token, &state);
       } break;
       case '0':
       case '1':
@@ -422,21 +437,21 @@ past_literal_close_quote:
       case '8':
       case '9': {
         arith_token token;
-        token.begin = begin;
-        if (!state.value_allowed_next) {
-          token.type = ARITH_TOKEN_ERROR;
-          token.value.error_msg = "consecutive value now allowed";
-          send_output(&arg, token);
+        token.offset = begin - original_begin;
+        if (unlikely(!state.value_allowed_next)) {
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "consecutive value not allowed";
+          ret.value.err.offset = begin - original_begin;
           goto end;
         }
-        token.type = ARITH_TOKEN_U32;
+        token.type = ARITH_U32;
         token.value.u32 = ch - '0';
         ++begin;
         while (1) {
           assert(token.value.u32 <= UINT32_MAX);
           if (begin == end) {
             // end of number from end of string
-            send_output_update_state(&arg, token, &state);
+            send_output(&output, &ret, token, &state);
             goto end;
           }
 
@@ -444,7 +459,7 @@ past_literal_close_quote:
 
           if (ch < '0' || ch > '9') {
             // end of number from end of digits
-            send_output_update_state(&arg, token, &state);
+            send_output(&output, &ret, token, &state);
             goto begin_iter;
           }
 
@@ -464,11 +479,9 @@ past_literal_close_quote:
             uint32_t next_value = token_value + (ch - '0');
             if (next_value < token_value) {
 handle_value_overflow:
-              arith_token err_token;
-              err_token.type = ARITH_TOKEN_ERROR;
-              err_token.begin = token.begin;
-              err_token.value.error_msg = "num too large";
-              send_output(&arg, err_token);
+              ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+              ret.value.err.reason = "num too large";
+              ret.value.err.offset = token.offset;
               goto end;
             }
             token_value = next_value;
@@ -479,56 +492,52 @@ handle_value_overflow:
       } break;
       default: {
         if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z' || ch == '_')) {
-          if (!state.value_allowed_next) {
-            arith_token token;
-            token.begin = begin;
-            token.type = ARITH_TOKEN_ERROR;
-            token.value.error_msg = "consecutive value now allowed";
-            send_output(&arg, token);
+          arith_token token;
+          token.type = ARITH_SYMBOL;
+          token.offset = begin - original_begin;
+          if (unlikely(!state.value_allowed_next)) {
+            ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+            ret.value.err.reason = "consecutive value not allowed";
+            ret.value.err.offset = token.offset;
             goto end;
           }
-          arith_token token;
-          token.type = ARITH_TOKEN_SYMBOL;
-          token.begin = begin;
 
           ++begin;
           while (1) {
             if (begin == end) {
               // emit symbol, end of string reached
-              size_t symbol_index = get_arith_expr_allowed_symbol_index(token.begin, begin, allowed_symbols);
-              if (symbol_index != -1) {
+              size_t symbol_index = get_arith_expr_allowed_symbol_index(original_begin + token.offset, begin, allowed_symbols);
+              if (likely(symbol_index != -1)) {
                 token.value.symbol_value_lookup = symbol_index;
-                send_output_update_state(&arg, token, &state);
+                send_output(&output, &ret, token, &state);
               } else {
-                token.type = ARITH_TOKEN_ERROR;
-                token.value.error_msg = "invalid symbol";
-                send_output(&arg, token);
+                ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+                ret.value.err.reason = "invalid symbol";
+                ret.value.err.offset = token.offset;
               }
               goto end;
             }
             ch = *begin;
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_')) {
               // emit symbol, end of symbol reached
-              size_t symbol_index = get_arith_expr_allowed_symbol_index(token.begin, begin, allowed_symbols);
+              size_t symbol_index = get_arith_expr_allowed_symbol_index(original_begin + token.offset, begin, allowed_symbols);
               if (symbol_index != -1) {
                 token.value.symbol_value_lookup = symbol_index;
-                send_output_update_state(&arg, token, &state);
+                send_output(&output, &ret, token, &state);
                 goto begin_iter;
               } else {
-                token.type = ARITH_TOKEN_ERROR;
-                token.value.error_msg = "invalid symbol";
-                send_output(&arg, token);
+                ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+                ret.value.err.reason = "invalid symbol";
+                ret.value.err.offset = begin - original_begin;
                 goto end;
               }
             }
             ++begin;
           }
         } else {
-          arith_token token;
-          token.type = ARITH_TOKEN_ERROR;
-          token.begin = begin;
-          token.value.error_msg = "invalid unit in arith expr";
-          send_output(&arg, token);
+          ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+          ret.value.err.reason = "invalid character in arith expr";
+          ret.value.err.offset = begin - original_begin;
           goto end;
         }
       } break;
@@ -536,110 +545,170 @@ handle_value_overflow:
     ++begin;
   }
 end:
+  return ret;
 }
 
+// ============================ arith_expr =====================================
+
+// represents a token which is part of a parsed and valid expression.
+// similar to arith_token, but doesn't include diagnostic information
+typedef struct {
+  arith_type type;
+  arith_value value;
+} arith_parsed;
+
+typedef struct {
+  size_t stack_required; // number of stack elements needed to execute the expression
+  const arith_parsed* begin;
+  const arith_parsed* end;
+} arith_expr;
+
+// ================================ arith_expr_result ==========================
+
+typedef enum {
+  ARITH_EXPR_ERROR,
+  ARITH_EXPR_OK,
+} arith_expr_result_type;
+
+typedef struct {
+  size_t offset;
+  const char* reason;
+} arith_expr_error;
+
+typedef union {
+  arith_expr_error err; // ARITH_EXPR_ERROR
+  arith_expr expr;      // ARITH_EXPR_OK
+} arith_expr_result_value;
+
+typedef struct {
+  arith_expr_result_type type;
+  arith_expr_result_value value;
+} arith_expr_result;
+
+// =========================== functions =======================================
+
 // all operations are left to right associative
-// lower number indicates higher precedence.
-static unsigned int operation_precedence(arith_token_type type) {
+// smaller number indicates higher precedence.
+static unsigned int operation_precedence(arith_type type) {
   switch (type) {
-    case ARITH_TOKEN_UNARY_ADD:
-    case ARITH_TOKEN_UNARY_SUB:
-    case ARITH_TOKEN_BITWISE_COMPLEMENT:
+    case ARITH_UNARY_ADD:
+    case ARITH_UNARY_SUB:
+    case ARITH_BITWISE_COMPLEMENT:
       return 0; // unary must have highest
       break;
-    case ARITH_TOKEN_MUL:
-    case ARITH_TOKEN_DIV:
-    case ARITH_TOKEN_MOD:
+    case ARITH_MUL:
+    case ARITH_DIV:
+    case ARITH_MOD:
       return 1;
       break;
-    case ARITH_TOKEN_ADD:
-    case ARITH_TOKEN_SUB:
+    case ARITH_ADD:
+    case ARITH_SUB:
       return 2;
       break;
-    case ARITH_TOKEN_LEFT_SHIFT:
-    case ARITH_TOKEN_RIGHT_SHIFT:
+    case ARITH_LEFT_SHIFT:
+    case ARITH_RIGHT_SHIFT:
       return 3;
       break;
-    case ARITH_TOKEN_LESS_THAN:
-    case ARITH_TOKEN_LESS_THAN_EQUAL:
+    case ARITH_LESS_THAN:
+    case ARITH_LESS_THAN_EQUAL:
       return 4;
       break;
-    case ARITH_TOKEN_GREATER_THAN:
-    case ARITH_TOKEN_GREATER_THAN_EQUAL:
+    case ARITH_GREATER_THAN:
+    case ARITH_GREATER_THAN_EQUAL:
       return 5;
       break;
-    case ARITH_TOKEN_BITWISE_AND:
+    case ARITH_BITWISE_AND:
       return 6;
       break;
-    case ARITH_TOKEN_BITWISE_XOR:
+    case ARITH_BITWISE_XOR:
       return 7;
       break;
-    case ARITH_TOKEN_BITWISE_OR:
+    case ARITH_BITWISE_OR:
       return 8;
       break;
-    case ARITH_TOKEN_EQUAL:
-    case ARITH_TOKEN_NOT_EQUAL:
+    case ARITH_EQUAL:
+    case ARITH_NOT_EQUAL:
     default:
-      assert(type == ARITH_TOKEN_EQUAL || type == ARITH_TOKEN_NOT_EQUAL);
+      assert(type == ARITH_EQUAL || type == ARITH_NOT_EQUAL);
       return 9;
       break;
   }
 }
 
-// overwrites the range begin to end with its reverse polish notation equivalent
-// returns the new end of the range
-// https://math.oxford.emory.edu/site/cs171/shuntingYardAlgorithm/
-// unary add and sub are converted to binary add and sub
-// (since they got an extra zero in the tokenization step)
-arith_token* parse_arithmetic_expression(arith_token* begin, arith_token* end) {
+// out points to a range with an equal number of elements to the input. the
+// output range can overwrite the input range, only if the output range starts
+// at or before the start of the input range. parses the arithmetic expression.
+// unary add and sub are converted to binary add and sub (since they got an
+// extra zero in the tokenization step)
+arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* end, arith_parsed* out) {
+  // https://math.oxford.emory.edu/site/cs171/shuntingYardAlgorithm/
   assert(begin <= end);
-  arith_token* begin_copy = begin; // save for below
+  assert(sizeof(arith_parsed) <= sizeof(arith_token)); // static
+
+  arith_expr_result ret;
+  ret.type = ARITH_EXPR_OK;
+  ret.value.expr.stack_required = 0;
+  ret.value.expr.begin = out;
+  size_t current_stack_size = 0;
 
   size_t input_size = end - begin;
   arith_token operator_stack[input_size];
   arith_token* operator_stack_top = operator_stack;
 
-  arith_token* write_pos = begin;
-
   while (begin != end) {
     arith_token token = *begin;
 
     switch (token.type) {
-      case ARITH_TOKEN_ERROR:
-        *write_pos++ = token;
-        goto end;
-        break;
-      case ARITH_TOKEN_U32:
-      case ARITH_TOKEN_SYMBOL:
+      case ARITH_U32:
+      case ARITH_SYMBOL:
         // "If the incoming symbol is an operand, print it."
-        *write_pos++ = token;
+        current_stack_size += 1;
+        if (current_stack_size > ret.value.expr.stack_required) {
+          ret.value.expr.stack_required = current_stack_size;
+        }
+        out->type = token.type;
+        out->value = token.value;
+        ++out;
         break;
-      case ARITH_TOKEN_LEFT_BRACKET:
+      case ARITH_LEFT_BRACKET:
         // "If the incoming symbol is a left parenthesis, push it on the stack"
         *operator_stack_top++ = token;
         break;
-      case ARITH_TOKEN_RIGHT_BRACKET: {
+      case ARITH_RIGHT_BRACKET: {
         // "If the incoming symbol is a right parenthesis: discard the right
         // parenthesis, pop and print the stack symbols until you see a left
         // parenthesis. Pop the left parenthesis and discard it."
         while (1) {
-          if (operator_stack == operator_stack_top) {
-            token.type = ARITH_TOKEN_ERROR;
-            token.value.error_msg = "no matching left bracket";
-            *write_pos++ = token;
+          if (unlikely(operator_stack == operator_stack_top)) {
+            ret.type = ARITH_EXPR_ERROR;
+            ret.value.err.offset = token.offset;
+            ret.value.err.reason = "no matching left bracket";
             goto end;
           }
 
           arith_token stack_top = *--operator_stack_top;
-          if (stack_top.type == ARITH_TOKEN_LEFT_BRACKET) {
+          if (stack_top.type == ARITH_LEFT_BRACKET) {
             break;
           }
-          *write_pos++ = stack_top;
+          if (unlikely(current_stack_size < 2)) {
+            ret.type = ARITH_EXPR_ERROR;
+            ret.value.err.offset = stack_top.offset;
+            ret.value.err.reason = "expression stack exhausted by op";
+            goto end;
+          }
+          current_stack_size -= 1;
+          switch (stack_top.type) {
+            case ARITH_UNARY_ADD:
+            case ARITH_UNARY_SUB:
+              stack_top.type *= -1; // unary was converted to binary op
+          }
+          out->type = stack_top.type;
+          out->value = stack_top.value;
+          ++out;
         }
       } break;
       default:
         // the incoming symbol is an operator
-
         unsigned int token_precedence = operation_precedence(token.type);
         while (1) {
           // "[If] the stack is empty or contains a left parenthesis on top,
@@ -649,7 +718,7 @@ arith_token* parse_arithmetic_expression(arith_token* begin, arith_token* end) {
             break;
           }
           arith_token stack_top = operator_stack_top[-1];
-          if (stack_top.type == ARITH_TOKEN_LEFT_BRACKET) {
+          if (stack_top.type == ARITH_LEFT_BRACKET) {
             *operator_stack_top++ = token;
             break;
           }
@@ -669,7 +738,21 @@ arith_token* parse_arithmetic_expression(arith_token* begin, arith_token* end) {
             // same precedence as the operator on the top of the stack and is
             // left associative -- continue to pop the stack until this is not
             // true. Then, push the incoming operator.
-            *write_pos++ = stack_top;
+            if (unlikely(current_stack_size < 2)) {
+              ret.type = ARITH_EXPR_ERROR;
+              ret.value.err.offset = stack_top.offset;
+              ret.value.err.reason = "expression stack exhausted by op";
+              goto end;
+            }
+            current_stack_size -= 1;
+            switch (stack_top.type) {
+              case ARITH_UNARY_ADD:
+              case ARITH_UNARY_SUB:
+                stack_top.type *= -1; // unary was converted to binary op
+            }
+            out->type = stack_top.type;
+            out->value = stack_top.value;
+            ++out;
             --operator_stack_top;
           }
         }
@@ -682,79 +765,42 @@ arith_token* parse_arithmetic_expression(arith_token* begin, arith_token* end) {
   // (No parentheses should remain.)"
   while (operator_stack != operator_stack_top) {
     arith_token stack_top = *--operator_stack_top;
-    if (stack_top.type == ARITH_TOKEN_LEFT_BRACKET) {
-      stack_top.type = ARITH_TOKEN_ERROR;
-      stack_top.value.error_msg = "no matching right bracket";
-      *write_pos++ = stack_top;
+    if (unlikely(stack_top.type == ARITH_LEFT_BRACKET)) {
+      ret.type = ARITH_EXPR_ERROR;
+      ret.value.err.offset = stack_top.offset;
+      ret.value.err.reason = "no matching right bracket";
       goto end;
     }
-    *write_pos++ = stack_top;
-  }
-
-  // verify pass and fixup: replace unary add/sub with bin (since they are now)
-  begin = begin_copy;
-  end = write_pos;
-
-  unsigned int stack_size = 0;
-  while (begin != end) {
-    switch (begin->type) {
-      case ARITH_TOKEN_U32:
-      case ARITH_TOKEN_SYMBOL:
-        stack_size += 1;
-        break;
-      case ARITH_TOKEN_UNARY_ADD:
-      case ARITH_TOKEN_UNARY_SUB:
-        // unary was converted to binary op. label it correctly
-        begin->type *= -1;
-      default:
-        if (stack_size < 2) {
-          arith_token err;
-          err.type = ARITH_TOKEN_ERROR;
-          err.begin = begin->begin;
-          err.value.error_msg = "expression stack exhausted by op";
-          *begin = err;
-          write_pos = begin + 1;
-          goto end;
-        }
-        stack_size -= 1;
+    if (unlikely(current_stack_size < 2)) {
+      ret.type = ARITH_EXPR_ERROR;
+      ret.value.err.offset = stack_top.offset;
+      ret.value.err.reason = "expression stack exhausted by op";
+      goto end;
+    }
+    current_stack_size -= 1;
+    switch (stack_top.type) {
+      case ARITH_UNARY_ADD:
+      case ARITH_UNARY_SUB:
+        stack_top.type *= -1; // unary was converted to binary op
         break;
     }
-    ++begin;
+    out->type = stack_top.type;
+    out->value = stack_top.value;
+    ++out;
   }
-  assert(stack_size == 1);
 
-end:
+  ret.value.expr.end = out;
 
-  assert(write_pos >= begin_copy);
-  assert(write_pos <= end);
-  return write_pos;
-}
-
-typedef struct {
-  const char* error_msg; // null on no error
-  size_t expression_offset; // offset within the arithmetic expression
-} arith_token_validate_result;
-
-// indicates if an error exists in the arithmetic expression
-arith_token_validate_result validate_arithmetic_expression(const arith_token* parsed_begin, //
-                                                           const arith_token* parsed_end,
-                                                           const CODE_UNIT* expression_begin) {
-  arith_token_validate_result ret;
-  assert(parsed_begin <= parsed_end);
-  ret.expression_offset = 0;
-  if (parsed_begin == parsed_end) {
-    ret.error_msg = "empty expression not allowed";
+  if (unlikely(ret.value.expr.begin == ret.value.expr.end)) {
+    ret.type = ARITH_EXPR_ERROR;
+    ret.value.err.offset = 0;
+    ret.value.err.reason = "empty expression not allowed";
     goto end;
   }
-  ret.error_msg = NULL;
-  while (parsed_begin != parsed_end) {
-    arith_token t = *parsed_begin++;
-    if (t.type == ARITH_TOKEN_ERROR) {
-      ret.error_msg = t.value.error_msg;
-      ret.expression_offset = t.begin - expression_begin;
-      goto end;
-    }
-  }
+
+  assert(current_stack_size == 1);
+  assert(ret.value.expr.begin < ret.value.expr.end);
+  assert(ret.value.expr.end - ret.value.expr.begin <= input_size);
 end:
   return ret;
 }

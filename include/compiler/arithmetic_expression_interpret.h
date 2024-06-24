@@ -2,23 +2,20 @@
 
 #include "arithmetic_expression.h"
 
-// begin to end points to an arithmetic expression that has been parsed by
-// parse_arithmetic_expression, then validated with
-// validate_arithmetic_expression. values indicates the value taken on by each
-// symbol in the expression, with offset indicated by the same position in the
-// allowed_symbols passed to tokenize_arithmetic_expression
-uint_fast32_t interpret_arithmetic_expression(const arith_token* begin, const arith_token* end, const uint_fast32_t* values) {
-  assert(begin < end); // empty not allowed. handled prior by validate_arithmetic_expression
-  size_t input_size = end - begin;
-  uint_fast32_t stack[input_size];
+// values indicates the value taken on by each symbol in the expression, with
+// offset indicated by the same position in the allowed_symbols passed to
+// tokenize_arithmetic_expression
+uint_fast32_t interpret_arithmetic_expression(arith_expr expr, const uint_fast32_t* values) {
+  assert(expr.begin < expr.end); // empty not allowed. case caught during parsing
+  uint_fast32_t stack[expr.stack_required];
   uint_fast32_t* stack_top = stack;
   do {
-    arith_token t = *begin;
+    arith_parsed t = *expr.begin;
     switch (t.type) {
-      case ARITH_TOKEN_U32:
+      case ARITH_U32:
         *stack_top++ = t.value.u32;
         break;
-      case ARITH_TOKEN_SYMBOL:
+      case ARITH_SYMBOL:
         *stack_top++ = values[t.value.symbol_value_lookup];
         break;
       default: {
@@ -27,63 +24,63 @@ uint_fast32_t interpret_arithmetic_expression(const arith_token* begin, const ar
         uint_fast32_t* result = stack_top - 2;
         stack_top -= 1;
         switch (t.type) {
-          case ARITH_TOKEN_ADD:
+          case ARITH_ADD:
             *result = lhs + rhs;
             break;
-          case ARITH_TOKEN_SUB:
+          case ARITH_SUB:
             *result = lhs - rhs;
             break;
-          case ARITH_TOKEN_MUL:
+          case ARITH_MUL:
             *result = lhs * rhs;
             break;
-          case ARITH_TOKEN_DIV:
+          case ARITH_DIV:
             *result = lhs / rhs;
             break;
-          case ARITH_TOKEN_MOD:
+          case ARITH_MOD:
             *result = lhs % rhs;
             break;
-          case ARITH_TOKEN_BITWISE_XOR:
+          case ARITH_BITWISE_XOR:
             *result = lhs ^ rhs;
             break;
-          case ARITH_TOKEN_BITWISE_COMPLEMENT:
+          case ARITH_BITWISE_COMPLEMENT:
             *result = ~rhs;
             break;
-          case ARITH_TOKEN_EQUAL:
+          case ARITH_EQUAL:
             *result = lhs == rhs;
             break;
-          case ARITH_TOKEN_NOT_EQUAL:
+          case ARITH_NOT_EQUAL:
             *result = lhs != rhs;
             break;
-          case ARITH_TOKEN_LESS_THAN:
+          case ARITH_LESS_THAN:
             *result = lhs < rhs;
             break;
-          case ARITH_TOKEN_LESS_THAN_EQUAL:
+          case ARITH_LESS_THAN_EQUAL:
             *result = lhs <= rhs;
             break;
-          case ARITH_TOKEN_LEFT_SHIFT:
+          case ARITH_LEFT_SHIFT:
             *result = lhs << rhs;
             break;
-          case ARITH_TOKEN_GREATER_THAN:
+          case ARITH_GREATER_THAN:
             *result = lhs > rhs;
             break;
-          case ARITH_TOKEN_GREATER_THAN_EQUAL:
+          case ARITH_GREATER_THAN_EQUAL:
             *result = lhs >= rhs;
             break;
-          case ARITH_TOKEN_RIGHT_SHIFT:
+          case ARITH_RIGHT_SHIFT:
             *result = lhs >> rhs;
             break;
-          case ARITH_TOKEN_BITWISE_AND:
+          case ARITH_BITWISE_AND:
             *result = lhs & rhs;
             break;
           default:
-          case ARITH_TOKEN_BITWISE_OR:
-            assert(t.type == ARITH_TOKEN_BITWISE_OR);
+          case ARITH_BITWISE_OR:
+            assert(t.type == ARITH_BITWISE_OR);
             *result = lhs | rhs;
             break;
         }
       } break;
     }
-    ++begin;
-  } while (begin != end);
+    ++expr.begin;
+  } while (expr.begin != expr.end);
   return stack_top[-1];
 }
