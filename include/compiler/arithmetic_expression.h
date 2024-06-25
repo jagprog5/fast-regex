@@ -52,9 +52,9 @@ typedef struct {
 // ======================== arith_tokenize_capacity ======================
 
 typedef enum {
-  ARITH_TOKENIZE_FILL_ARRAY = 0, // indicates that the value should be ignored
-  ARITH_TOKENIZE_CAPACITY_ERROR,
-  ARITH_TOKENIZE_CAPACITY_OK,
+  ARITH_TOKENIZE_FILL_ARRAY = 0, // second pass
+  ARITH_TOKENIZE_CAPACITY_ERROR, // first pass error
+  ARITH_TOKENIZE_CAPACITY_OK,    // first pass success
 } arith_tokenize_capacity_type;
 
 typedef struct {
@@ -84,6 +84,9 @@ static void send_output(arith_token** output,
                         arith_tokenize_capacity* dst, //
                         arith_token token,
                         arithmetic_expression_h_parse_state* state) {
+  // if *output is null, then this means the capacity is being obtained. in
+  // which case it increments dst. if *output is not NULL, then that is the
+  // position to write to
   if (*output == NULL) {
     dst->value.capacity += 1;
   } else {
@@ -149,7 +152,7 @@ typedef struct {
 // -1 if not in allowed symbols
 static size_t get_arith_expr_allowed_symbol_index(const CODE_UNIT* symbol_begin, //
                                                   const CODE_UNIT* symbol_end,
-                                                  arith_expr_allowed_symbols* allowed) {
+                                                  const arith_expr_allowed_symbols* allowed) {
   for (size_t i = 0; i < allowed->size; ++i) {
     arith_expr_symbol allowed_symbol = allowed->symbols[i];
 
@@ -184,7 +187,7 @@ try_next_symbol:
 arith_tokenize_capacity tokenize_arithmetic_expression(const CODE_UNIT* begin,
                                                        const CODE_UNIT* end, //
                                                        arith_token* output,
-                                                       arith_expr_allowed_symbols* allowed_symbols) {
+                                                       const arith_expr_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
   // given the previous token, what is allowed next?
   arithmetic_expression_h_parse_state state;
@@ -636,10 +639,13 @@ static unsigned int operation_precedence(arith_type type) {
 }
 
 // out points to a range with an equal number of elements to the input. the
-// output range can overwrite the input range, only if the output range starts
-// at or before the start of the input range. parses the arithmetic expression.
-// unary add and sub are converted to binary add and sub (since they got an
-// extra zero in the tokenization step)
+// output range can overwrite the input range if they start at the same
+// position. parses the arithmetic expression. unary add and sub are converted
+// to binary add and sub (since they got an extra zero in the tokenization
+// step).
+//
+// the return value depends on the lifetime of the input range, but does not
+// rely on the original expression string.
 arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* end, arith_parsed* out) {
   // https://math.oxford.emory.edu/site/cs171/shuntingYardAlgorithm/
   assert(begin <= end);
