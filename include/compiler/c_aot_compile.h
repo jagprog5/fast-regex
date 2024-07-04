@@ -16,8 +16,11 @@
 #include "likely_unlikely.hpp"
 
 // returns NULL on error - an appropriate error will have been printed to stderr
-// returns the dlopen handle for the compiled shared object
-void* compile(const char* c_compiler_path, const char* program_begin, const char* program_end) {
+// returns the dlopen handle for the compiled shared object.
+//
+// compiler_args is a null terminating list of cstr args which are passed to the
+// compiler. some args are already specified; compiler_args is appended to args.
+void* compile(const char* c_compiler, const char* program_begin, const char* program_end, const char* const* compiler_args) {
   int stdin_pipe[2] = {-1, -1};
   int stderr_pipe[2] = {-1, -1};
   // a memory file must be used here instead of a pipe, as otherwise this causes
@@ -95,11 +98,16 @@ void* compile(const char* c_compiler_path, const char* program_begin, const char
       }
     }
 
+    size_t num_extra_args = 0;
+    while (compiler_args[num_extra_args] != 0) {
+      ++num_extra_args;
+    }
+
     // copy required since args are non const
-    char* args[9];
+    char* args[9 + num_extra_args];
 
     // first arg always is self
-    const char* arg0_const = c_compiler_path;
+    const char* arg0_const = c_compiler;
     size_t arg0_size = strlen(arg0_const) + 1;
     char arg0[arg0_size];
     memcpy(arg0, arg0_const, arg0_size);
@@ -146,10 +154,32 @@ void* compile(const char* c_compiler_path, const char* program_begin, const char
     memcpy(arg7, arg7_const, arg7_size);
     args[7] = arg7;
 
-    args[8] = (char*)NULL; // execl args are null terminating
+    size_t extra_args_arena_size = 0;
 
-    // execvp does not modify the arg elements. even through args elems are non const
-    execvp(c_compiler_path, args);
+    for (size_t i = 0; i < num_extra_args; ++i) {
+      extra_args_arena_size += strlen(compiler_args[i]) + 1;
+
+    }
+
+    char extra_args_arena[extra_args_arena_size];
+    
+    {
+      char* extra_args_arena_walk = extra_args_arena;
+      for (size_t i = 0; i < num_extra_args; ++i) {
+        const char* the_arg = compiler_args[i];
+        args[8 + i] = extra_args_arena_walk;
+        while (1) {
+          char ch = *the_arg++;
+          bool complete = ch == '\0';
+          *extra_args_arena_walk++ = ch; // includes null
+          if (complete) break;
+        }
+      }
+    }
+
+    args[sizeof(args) / sizeof(*args) - 1] = (char*)NULL; // execl args are null terminating
+
+    execvp(c_compiler, args);
     perror("execl");    // only reached on error
     exit(EXIT_FAILURE); // in child process - exit now
     // all other fds will be closed by OS on child process exit.
@@ -198,7 +228,7 @@ void* compile(const char* c_compiler_path, const char* program_begin, const char
     }
 
     if (unlikely(child_return_status != 0)) {
-      fprintf(stderr, "child process containing %s exited with code %d, stderr:\n", c_compiler_path, child_return_status);
+      fprintf(stderr, "child process containing %s exited with code %d, stderr:\n", c_compiler, child_return_status);
       char buffer[1024];
       ssize_t count;
       size_t while_loop_limit = 1000; // make bounded in time for safety
@@ -237,7 +267,6 @@ void* compile(const char* c_compiler_path, const char* program_begin, const char
   }
 
 end:
-  (void)0;
   int close_errored = 0;
   if (stdin_pipe[0] != -1) close_errored |= close(stdin_pipe[0]);
   if (stdin_pipe[1] != -1) close_errored |= close(stdin_pipe[1]);
@@ -263,4 +292,10 @@ end:
   }
 
   return ret;
+}
+
+// overload for compile
+void* compile_no_args(const char* c_compiler, const char* program_begin, const char* program_end) {
+  const char* compiler_args = NULL;
+  return compile(c_compiler, program_begin, program_end, &compiler_args);
 }

@@ -11,9 +11,17 @@
 #define XSTR(x) STR(x)
 
 int main(void) {
-    const char* program = "int add(int a, int b) {return a + b;}";
+    const char* program = "\
+#ifndef MUST_BE_DEFINED\n\
+    #error arg pass failure\n\
+#endif\n\
+#ifndef MUST_BE_DEFINED2\n\
+    #error arg pass failure\n\
+#endif\n\
+int add(int a, int b) {return a + b;}";
     const char* compiler = XSTR(COMPILER_USED);
-    void* dl_handle = compile(compiler, program, program + strlen(program));
+    const char* const compile_args[] = {"-DMUST_BE_DEFINED", "-DMUST_BE_DEFINED2", NULL};
+    void* dl_handle = compile(compiler, program, program + strlen(program), compile_args);
 
 
     if (dl_handle == NULL) {
