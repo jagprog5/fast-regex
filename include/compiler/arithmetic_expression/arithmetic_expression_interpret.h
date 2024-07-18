@@ -33,12 +33,6 @@ uint_fast32_t interpret_arithmetic_expression(arith_expr expr, const uint_fast32
           case ARITH_MUL:
             *result = lhs * rhs;
             break;
-          case ARITH_DIV:
-            *result = lhs / rhs;
-            break;
-          case ARITH_MOD:
-            *result = lhs % rhs;
-            break;
           case ARITH_BITWISE_XOR:
             *result = lhs ^ rhs;
             break;

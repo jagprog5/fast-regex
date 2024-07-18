@@ -40,10 +40,12 @@ build/test/%: build/test/%.o
 # compilation test compile
 build/test/%_compile.o: test/%_compile.c test/test_common.h include/%_compile.h include/code_unit.h
 	mkdir -p -- $$(dirname '$@')
-	$(CC) -Itest -Iinclude -Iinclude/"$$(dirname -- '$<' | cut -c 6-)" -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE -DCOMPILER_USED=$(CC)
+	@#                     VVVVVVVVVVVVVVVVVV
+	$(CC) -Itest -Iinclude -Iinclude/compiler -Iinclude/"$$(dirname -- '$<' | cut -c 6-)" -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE -DCOMPILER_USED=$(CC)
 
 # compilation test link
 build/test/%_compile: build/test/%_compile.o
+	@#                        VVVV
 	$(CC) $^ -o $@ $(LDFLAGS) -ldl 
 
 # MISC

@@ -58,7 +58,6 @@ return arith_out;\
     int (*evaluate_expr)(const uint_fast32_t*);
     *(void**)(&evaluate_expr) = dlsym(dl_handle, "evaluate_expr");
     assert_continue(evaluate_expr != NULL);
-    printf("%d\n", evaluate_expr(symbol_values));
     bool ret = evaluate_expr(symbol_values) == expected_result;
     assert_continue(dlclose(dl_handle) == 0);
     return ret;
@@ -74,7 +73,7 @@ bool do_test_no_symbols(const CODE_UNIT* expression, uint_fast32_t expected_resu
 int main(void) {
   assert_continue(do_test_no_symbols(CODE_UNIT_LITERAL("1 + 3"), 4));
   assert_continue(do_test_no_symbols(CODE_UNIT_LITERAL("3 - 1"), 2));
-  assert_continue(do_test_no_symbols(CODE_UNIT_LITERAL("5 - ~3"), 9));
+  assert_continue(do_test_no_symbols(CODE_UNIT_LITERAL("5 - ~3"), (uint_fast32_t)5 - ~(uint_fast32_t)3));
 
   // stack test
   assert_continue(do_test_no_symbols(CODE_UNIT_LITERAL("5 * 2 + 3 * 7"), 31));

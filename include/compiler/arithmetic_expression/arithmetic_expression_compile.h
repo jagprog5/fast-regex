@@ -145,8 +145,6 @@ arith_compile_capacity generate_code_arithmetic_expression_block(char** output, 
       case ARITH_ADD:
       case ARITH_SUB:
       case ARITH_MUL:
-      case ARITH_DIV:
-      case ARITH_MOD:
       case ARITH_BITWISE_XOR:
       case ARITH_EQUAL:
       case ARITH_NOT_EQUAL:
@@ -172,12 +170,6 @@ arith_compile_capacity generate_code_arithmetic_expression_block(char** output, 
             break;
           case ARITH_MUL:
             generate_code_char(output, dst, '*');
-            break;
-          case ARITH_DIV:
-            generate_code_char(output, dst, '/');
-            break;
-          case ARITH_MOD:
-            generate_code_char(output, dst, '%');
             break;
           case ARITH_BITWISE_XOR:
             generate_code_char(output, dst, '^');

@@ -15,15 +15,14 @@ typedef enum {
   ARITH_ADD = '+',   // binary op
   ARITH_SUB = '-',   // binary op
   ARITH_MUL = '*',
-  ARITH_DIV = '/',
-  ARITH_MOD = '%',
   ARITH_LEFT_BRACKET = '(',
   ARITH_RIGHT_BRACKET = ')',
   ARITH_BITWISE_XOR = '^',
   ARITH_BITWISE_AND = '&',
   ARITH_BITWISE_OR = '|',
   ARITH_EQUAL = '=',               // =
-  ARITH_BITWISE_COMPLEMENT = 0x80, // only unary. enum values continue past ascii
+  // enum value 0x80 ensure no conflict with above enum values (0x80 is after ascii range)
+  ARITH_BITWISE_COMPLEMENT = 0x80, // only unary.
   ARITH_NOT_EQUAL,                 // !=
   ARITH_LESS_THAN,                 // <
   ARITH_LESS_THAN_EQUAL,           // <=
@@ -45,7 +44,7 @@ typedef union {
 typedef struct {
   arith_type type;
   arith_value value;
-  // used for diagnostic information on error
+  // used for diagnostic information on error. references an offset in the input string
   size_t offset;
 } arith_token;
 
@@ -600,8 +599,6 @@ static unsigned int operation_precedence(arith_type type) {
       return 0; // unary must have highest
       break;
     case ARITH_MUL:
-    case ARITH_DIV:
-    case ARITH_MOD:
       return 1;
       break;
     case ARITH_ADD:
@@ -643,9 +640,6 @@ static unsigned int operation_precedence(arith_type type) {
 // position. parses the arithmetic expression. unary add and sub are converted
 // to binary add and sub (since they got an extra zero in the tokenization
 // step).
-//
-// the return value depends on the lifetime of the input range, but does not
-// rely on the original expression string.
 arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* end, arith_parsed* out) {
   // https://math.oxford.emory.edu/site/cs171/shuntingYardAlgorithm/
   assert(begin <= end);
@@ -739,11 +733,11 @@ arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* e
             *operator_stack_top++ = token;
             break;
           } else {
-            // If the incoming symbol is an operator and has either lower
+            // "If the incoming symbol is an operator and has either lower
             // precedence than the operator on the top of the stack, or has the
             // same precedence as the operator on the top of the stack and is
             // left associative -- continue to pop the stack until this is not
-            // true. Then, push the incoming operator.
+            // true. Then, push the incoming operator."
             if (unlikely(current_stack_size < 2)) {
               ret.type = ARITH_EXPR_ERROR;
               ret.value.err.offset = stack_top.offset;

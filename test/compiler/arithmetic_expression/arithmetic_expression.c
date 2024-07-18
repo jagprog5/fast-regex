@@ -560,7 +560,7 @@ int main(void) {
     assert_continue(0 == strcmp(ret.value.err.reason, "consecutive value not allowed"));
   }
   { // test wholistic
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 / -'a')");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("(variable & 6) = (32 * -'a')");
 
     arith_expr_symbol one_symbol;
     one_symbol.begin = CODE_UNIT_LITERAL("variable");
@@ -606,7 +606,7 @@ int main(void) {
     assert_continue(array_output[7].offset == 18);
     assert_continue(array_output[7].value.u32 == 32);
 
-    assert_continue(array_output[8].type == ARITH_DIV);
+    assert_continue(array_output[8].type == ARITH_MUL);
     assert_continue(array_output[8].offset == 21);
 
     assert_continue(array_output[9].type == ARITH_U32);
@@ -749,7 +749,7 @@ int main(void) {
   }
 
   { // too many ops
-    const CODE_UNIT* expr = CODE_UNIT_LITERAL("1 / / 3");
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("1 * * 3");
     union {
       arith_token tokens[4];
       arith_parsed parsed[4];
@@ -759,9 +759,9 @@ int main(void) {
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);
     assert_continue(array_output.tokens[0].value.u32 == 1);
-    assert_continue(array_output.tokens[1].type == ARITH_DIV);
+    assert_continue(array_output.tokens[1].type == ARITH_MUL);
     assert_continue(array_output.tokens[1].offset == 2);
-    assert_continue(array_output.tokens[2].type == ARITH_DIV);
+    assert_continue(array_output.tokens[2].type == ARITH_MUL);
     assert_continue(array_output.tokens[2].offset == 4);
     assert_continue(array_output.tokens[3].type == ARITH_U32);
     assert_continue(array_output.tokens[3].offset == 6);
