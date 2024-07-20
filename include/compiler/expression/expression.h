@@ -29,6 +29,7 @@ typedef union {
 typedef struct {
   expr_token_type type;
   expr_token_data data;
+  size_t offset; // for diagnostic information
 } expr_token;
 
 typedef struct {
@@ -60,8 +61,7 @@ typedef struct {
   // ret propagates errors to the top level call
   expr_tokenize_result ret;
 
-  // true indicates that the last argument was parsed.
-  // false indicates that not the last argument was parsed.
+  // true iff last argument was parsed.
   bool function_complete;
 } expr_tokenize_result_internal;
 
@@ -100,12 +100,23 @@ static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
   expr_token token;
   token.data.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
+  token.offset = output->pos - output->begin;
+  send_to_output(output, token);
+}
+
+// offset points to character before
+static void send_escaped_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
+  expr_token token;
+  token.data.literal = ch;
+  token.type = EXPR_TOKEN_LITERAL;
+  token.offset = (output->pos - output->begin) - 1;
   send_to_output(output, token);
 }
 
 static void send_endarg_to_output(expr_tokenize_arg* output) {
   expr_token token;
   token.type = EXPR_TOKEN_ENDARG;
+  token.offset = output->pos - output->begin;
   send_to_output(output, token);
 }
 
@@ -113,6 +124,7 @@ static expr_token* reserve_in_output(expr_tokenize_arg* output) {
   expr_token* ret = NULL;
   if (!output->getting_capacity) {
     ret = output->out;
+    ret->offset = output->pos - output->begin;
   }
   ++output->out;
   return ret;
@@ -151,31 +163,31 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
           case '{':
           case ',':
           case '}':
-            send_literal_to_output(arg, ch);
+            send_escaped_to_output(arg, ch);
             break;
           case 'a':
-            send_literal_to_output(arg, '\a');
+            send_escaped_to_output(arg, '\a');
             break;
           case 'b':
-            send_literal_to_output(arg, '\b');
+            send_escaped_to_output(arg, '\b');
             break;
           case 't':
-            send_literal_to_output(arg, '\t');
+            send_escaped_to_output(arg, '\t');
             break;
           case 'n':
-            send_literal_to_output(arg, '\n');
+            send_escaped_to_output(arg, '\n');
             break;
           case 'v':
-            send_literal_to_output(arg, '\v');
+            send_escaped_to_output(arg, '\v');
             break;
           case 'f':
-            send_literal_to_output(arg, '\f');
+            send_escaped_to_output(arg, '\f');
             break;
           case 'r':
-            send_literal_to_output(arg, '\r');
+            send_escaped_to_output(arg, '\r');
             break;
           case 'e':
-            send_literal_to_output(arg, '\e');
+            send_escaped_to_output(arg, '\e');
             break;
         }
       } break;
