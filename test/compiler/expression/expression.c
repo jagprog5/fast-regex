@@ -1,6 +1,5 @@
 #include <assert.h>
 
-#define USE_WCHAR
 #include <expression.h>
 
 #include "test_common.h"

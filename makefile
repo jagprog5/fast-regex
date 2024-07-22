@@ -1,10 +1,15 @@
-CFLAGS = -std=c99
+CFLAGS := -std=c99
+
+ifneq ($(USE_WCHAR),)
+CFLAGS += -DUSE_WCHAR -Wall -Wextra
+endif
+
 # no heap
 LDFLAGS =-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free
 
-TEST_SOURCES = $(shell find test -type f -name '*.c')
-TEST_OBJS = $(patsubst test/%.c,build/test/%.o,$(TEST_SOURCES))
-TEST_BINARIES = $(patsubst test/%.c,build/test/%,$(TEST_SOURCES))
+TEST_SOURCES := $(shell find test -type f -name '*.c')
+TEST_OBJS := $(patsubst test/%.c,build/test/%.o,$(TEST_SOURCES))
+TEST_BINARIES := $(patsubst test/%.c,build/test/%,$(TEST_SOURCES))
 
 .PHONY: all debug test clean
 

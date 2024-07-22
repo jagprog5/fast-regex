@@ -1,5 +1,3 @@
-#define USE_WCHAR
-
 #include "arithmetic_expression.h"
 
 #include "test_common.h"

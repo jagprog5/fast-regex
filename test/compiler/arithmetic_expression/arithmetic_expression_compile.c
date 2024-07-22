@@ -1,5 +1,3 @@
-#define USE_WCHAR
-
 #include "arithmetic_expression_compile.h"
 #include "c_aot_compile.h"
 
