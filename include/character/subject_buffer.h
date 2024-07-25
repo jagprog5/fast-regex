@@ -4,11 +4,12 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#include <likely_unlikely.hpp>
-#include "code_unit.h" 
+#include "code_unit.h"
+
+#include "basic/likely_unlikely.h"
 
 #ifdef USE_WCHAR
-#include "wc_input.h"
+#include "character/wc_input.h"
 #endif
 
 #ifdef TESTING_HOOK

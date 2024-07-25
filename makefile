@@ -34,19 +34,19 @@ test: $(TEST_BINARIES)
 	test/run_tests.sh
 
 # base test compile
-build/test/%.o: test/%.c test/test_common.h include/%.h include/code_unit.h
+build/test/%.o: test/%.c test/test_common.h include/%.h
 	mkdir -p -- $$(dirname '$@')
-	$(CC) -Itest -Iinclude -Iinclude/"$$(dirname -- '$<' | cut -c 6-)" -c $< -o $@ $(CFLAGS)
+	$(CC) -Itest -Iinclude -c $< -o $@ $(CFLAGS)
 
 # base test link
 build/test/%: build/test/%.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 # compilation test compile
-build/test/%_compile.o: test/%_compile.c test/test_common.h include/%_compile.h include/code_unit.h
+build/test/%_compile.o: test/%_compile.c test/test_common.h include/%_compile.h
 	mkdir -p -- $$(dirname '$@')
-	@#                     VVVVVVVVVVVVVVVVVV
-	$(CC) -Itest -Iinclude -Iinclude/compiler -Iinclude/"$$(dirname -- '$<' | cut -c 6-)" -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE -DCOMPILER_USED=$(CC)
+	@#                                           VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+	$(CC) -Itest -Iinclude -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE -DCOMPILER_USED=$(CC)
 
 # compilation test link
 build/test/%_compile: build/test/%_compile.o

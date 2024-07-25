@@ -1,6 +1,7 @@
-#include "wc_input.h"
 #include <locale.h>
 #include <stdio.h>
+
+#include "character/wc_input.h"
 
 #include "test_common.h"
 extern int has_errors;

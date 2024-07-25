@@ -2,19 +2,17 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#include "code_unit.h"
-#include "likely_unlikely.hpp"
+#include <stdint.h>
+
+#include "basic/likely_unlikely.h"
+#include "character/code_unit.h"
 
 typedef struct {
   const CODE_UNIT* begin;
   const CODE_UNIT* end;
 } expr_token_string_range;
 
-typedef enum {
-  EXPR_TOKEN_LITERAL,
-  EXPR_TOKEN_FUNCTION,
-  EXPR_TOKEN_ENDARG
-} expr_token_type;
+typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
 
 typedef struct {
   expr_token_string_range name;
@@ -22,7 +20,7 @@ typedef struct {
 } expr_token_function_data;
 
 typedef union {
-  CODE_UNIT literal; // EXPR_TOKEN_LITERAL
+  CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
   expr_token_function_data function; // EXPR_TOKEN_FUNCTION
 } expr_token_data;
 
@@ -189,6 +187,74 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
           case 'e':
             send_escaped_to_output(arg, '\e');
             break;
+          case 'x': {
+            expr_token token;
+            token.type = EXPR_TOKEN_LITERAL;
+            token.offset = (arg->pos - arg->begin) - 1;
+            // escaped hex string.
+            arg->pos++;
+            if (unlikely(arg->pos == arg->end)) {
+              ret.ret.offset = arg->pos - arg->begin;
+              ret.ret.reason = "expecting content for hex literal";
+              goto end;
+            }
+
+            ch = *arg->pos;
+
+            if (unlikely(ch != '{')) {
+              ret.ret.offset = arg->pos - arg->begin;
+              ret.ret.reason = "expecting '{', hex syntax is: \\x{abc}";
+              goto end;
+            }
+
+            uint32_t hex_value = 0;
+            for (size_t i = 0; i < 8; ++i) { // 4 bytes (8 nibbles) in u32
+              ++arg->pos;
+              if (unlikely(arg->pos == arg->end)) {
+                ret.ret.offset = arg->pos - arg->begin;
+                ret.ret.reason = "hex content not finished";
+                goto end;
+              }
+
+              ch = *arg->pos;
+
+              if (ch >= '0' && ch <= '9') {
+                hex_value <<= 4;
+                hex_value += ch - '0';
+              } else if (ch >= 'a' && ch <= 'f') {
+                hex_value <<= 4;
+                hex_value += (ch - 'a') + 10;
+              } else if (ch >= 'A' && ch <= 'F') {
+                hex_value <<= 4;
+                hex_value += (ch - 'A') + 10;
+              } else if (ch == '}') {
+                goto past_hex_completion;
+              } else {
+                ret.ret.offset = arg->pos - arg->begin;
+                ret.ret.reason = "invalid hex escaped character";
+                goto end;
+              }
+            }
+
+            ++arg->pos;
+
+            if (unlikely(arg->pos == arg->end)) {
+              ret.ret.offset = arg->pos - arg->begin;
+              ret.ret.reason = "hex content not finished";
+              goto end;
+            }
+
+            ch = *arg->pos;
+
+            if (unlikely(ch != '}')) {
+              ret.ret.offset = arg->pos - arg->begin;
+              ret.ret.reason = "hex content overlong. expecting '}'";
+              goto end;
+            }
+            past_hex_completion:
+            token.data.literal = hex_value;
+            send_to_output(arg, token);
+          } break;
         }
       } break;
       case '}':

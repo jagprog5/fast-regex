@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "code_unit.h"
-#include "likely_unlikely.hpp"
+#include "basic/likely_unlikely.h"
+#include "character/code_unit.h"
 
 // ============================== arith_token ==================================
 

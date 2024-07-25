@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include <expression.h>
+#include "compiler/expression/expression.h"
 
 #include "test_common.h"
 extern int has_errors;
@@ -295,6 +295,82 @@ int main(void) {
     assert_continue(tokens[15].data.literal == 'f');
 
     assert_continue(tokens[16].type == EXPR_TOKEN_ENDARG);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "expecting content for hex literal"));
+    assert_continue(cap.offset == 2);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\xq");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "expecting '{', hex syntax is: \\x{abc}"));
+    assert_continue(cap.offset == 2);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "hex content not finished"));
+    assert_continue(cap.offset == 3);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{a");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "hex content not finished"));
+    assert_continue(cap.offset == 4);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{q");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "invalid hex escaped character"));
+    assert_continue(cap.offset == 3);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{aaaaaaaaa}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "hex content overlong. expecting '}'"));
+    assert_continue(cap.offset == 11);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{aaaaaaaa}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(tokens[0].data.literal == (CODE_UNIT)0xaaaaaaaa);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("\\x{aa}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(tokens[0].data.literal == (CODE_UNIT)0xaa);
   }
   return has_errors;
 }

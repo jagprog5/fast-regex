@@ -1,6 +1,7 @@
 #define TESTING_HOOK
 
 #include <assert.h>
+#include <locale.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -15,9 +16,7 @@ void set_data_to_read_next(const char* data) {
   memcpy(fread_wrapper_data, data, len * sizeof(char));
 }
 
-#include "subject_buffer.h"
-
-#include <locale.h>
+#include "character/subject_buffer.h"
 
 #include "test_common.h"
 extern int has_errors;

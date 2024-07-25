@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include "arithmetic_expression.h"
+#include "compiler/arithmetic_expression/arithmetic_expression.h"
 
 typedef enum {
   ARITH_COMPILE_FILL_ARRAY = 0, // second pass
