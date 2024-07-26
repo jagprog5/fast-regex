@@ -14,9 +14,22 @@ typedef struct {
 
 typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
 
+typedef enum {
+  EXPR_MARKER_NO, // no marker
+  EXPR_MARKER_YES
+} expr_marker_presence;
+
+typedef struct {
+  expr_marker_presence present; // other first are only applicable if present
+  uint32_t marker_number;       // which marker is this?
+  int offset;                   // placement of marker relative to beginning or end expression function
+} expr_marker;
+
 typedef struct {
   expr_token_string_range name;
   size_t num_args;
+  expr_marker begin_marker;
+  expr_marker end_marker;
 } expr_token_function_data;
 
 typedef union {
@@ -251,7 +264,7 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
               ret.ret.reason = "hex content overlong. expecting '}'";
               goto end;
             }
-            past_hex_completion:
+past_hex_completion:
             token.data.literal = hex_value;
             send_to_output(arg, token);
           } break;
@@ -275,12 +288,20 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
         // function call
         const CODE_UNIT* const function_begin = arg->pos; // for offset calculation
         expr_token* function_token = reserve_in_output(arg);
+
         if (function_token) {
           function_token->type = EXPR_TOKEN_FUNCTION;
           function_token->data.function.name.begin = arg->pos + 1;
           function_token->data.function.num_args = 0;
+          // init default function markers
+          function_token->data.function.begin_marker.present = EXPR_MARKER_NO;
+          function_token->data.function.begin_marker.marker_number = 0;
+          function_token->data.function.begin_marker.offset = 0;
+          function_token->data.function.end_marker.present = EXPR_MARKER_NO;
+          function_token->data.function.end_marker.marker_number = 0;
+          function_token->data.function.end_marker.offset = 0;
         }
-        // parse the function name
+        // parse the function name and markers
         while (1) {
           ++arg->pos;
           if (unlikely(arg->pos == arg->end)) {
@@ -289,6 +310,32 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
             goto end;
           }
           ch = *arg->pos;
+          if (ch >= '0' && ch <= '9') {
+            // add to marker
+            uint32_t next_value = 10 * function_token->data.function.begin_marker.marker_number;
+            if (next_value / 10 != function_token->data.function.begin_marker.marker_number) {
+              goto handle_value_overflow;
+            }
+            function_token->data.function.begin_marker.marker_number = next_value;
+
+            { // checked add
+              uint32_t next_value = function_token->data.function.begin_marker.marker_number + (ch - '0');
+              if (next_value < function_token->data.function.begin_marker.marker_number) {
+handle_value_overflow:
+                ret.ret.offset = arg->pos - arg->begin;
+                ret.ret.reason = "begin marker too large";
+                goto end;
+              }
+              function_token->data.function.begin_marker.marker_number = next_value;
+            }
+          } else {
+            // function name begin
+            break;
+          }
+        }
+
+        // function name (after marker)
+        while (1) {
           switch (ch) {
             case '}':
             case ',':
@@ -302,6 +349,13 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
               }
               break;
           }
+          ++arg->pos;
+          if (unlikely(arg->pos == arg->end)) {
+            ret.ret.offset = function_begin - arg->begin;
+            ret.ret.reason = "function name ended abruptly";
+            goto end;
+          }
+          ch = *arg->pos;
         }
 end_of_function_name:
         // parse the arguments
