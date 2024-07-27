@@ -327,7 +327,7 @@ past_hex_completion:
               marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID; // next phase
             } break;
             case MARKER_PARSE_PHASE_PARSING_ID: {
-              // digit or plus minus allows
+              // digit or plus minus allowed
               if (ch == '-' || ch == '+') {
                 offset_is_positive = ch == '+';
                 marker_parse_phase = MARKER_PARSE_PHASE_BEGIN_OFFSET;
@@ -371,6 +371,8 @@ after_begin_marker:
           function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
           function_token->data.function.name.begin = arg->pos;
         }
+        // parsing the function name.
+        // looking for }, ',', or a digit to signify the end of the function name
         while (1) {
           switch (ch) {
             case '}':
@@ -381,7 +383,22 @@ after_begin_marker:
               if (ch == '}') {
                 goto end_of_function_parse; // {function_name}
               } else {
-                goto end_of_function_name; // break outer
+                goto after_end_marker; // break outer
+              }
+              break;
+            default:
+              if (ch >= '0' && ch <= '9') {
+                if (function_token) {
+                  function_token->data.function.name.end = arg->pos;
+                  function_token->data.function.end_marker.present = true;
+                }
+                // reset and reuse for end marker as well
+                marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID;
+                marker_number = 0;
+                marker_offset = 0;
+                offset_is_positive = true;
+                append_ascii_to_uint32(&marker_number, ch);
+                goto before_end_marker;
               }
               break;
           }
@@ -393,7 +410,63 @@ after_begin_marker:
           }
           ch = *arg->pos;
         }
-end_of_function_name:
+before_end_marker:
+        while (1) {
+          ++arg->pos;
+          if (unlikely(arg->pos == arg->end)) {
+            ret.ret.offset = function_begin - arg->begin;
+            ret.ret.reason = "function name ended abruptly";
+            goto end;
+          }
+          ch = *arg->pos;
+          if (ch == '}' || ch == ',') {
+            if (marker_parse_phase == MARKER_PARSE_PHASE_BEGIN_OFFSET) {
+              ret.ret.offset = arg->pos - arg->begin;
+              ret.ret.reason = "unexpected character in end marker offset start";
+              goto end;
+            }
+            if (ch == '}') {
+              goto end_of_function_parse; // {function_name}
+            } else {
+              goto after_end_marker; // break outer
+            }
+          }
+          switch (marker_parse_phase) {
+            case MARKER_PARSE_PHASE_PARSING_ID:
+              // digit or plus minus allowed
+              if (ch >= '0' && ch <= '9') {
+                if (!append_ascii_to_uint32(&marker_number, ch)) {
+                  ret.ret.offset = function_begin - arg->begin;
+                  ret.ret.reason = "overflow on marker end value";
+                  goto end;
+                }
+              } else if (ch == '+' || ch == '-') {
+                offset_is_positive = ch == '+';
+                marker_parse_phase = MARKER_PARSE_PHASE_BEGIN_OFFSET;
+              } else {
+                ret.ret.offset = arg->pos - arg->begin;
+                ret.ret.reason = "unexpected character in end marker";
+                goto end;
+              }
+              break;
+            case MARKER_PARSE_PHASE_BEGIN_OFFSET:
+            case MARKER_PARSE_PHASE_PARSING_OFFSET:
+              if (ch >= '0' && ch <= '9') {
+                if (!append_ascii_to_int(&marker_offset, ch)) {
+                  ret.ret.offset = function_begin - arg->begin;
+                  ret.ret.reason = "overflow on marker end value offset";
+                  goto end;
+                }
+                marker_parse_phase = MARKER_PARSE_PHASE_PARSING_OFFSET;
+              } else {
+                ret.ret.offset = arg->pos - arg->begin;
+                ret.ret.reason = "unexpected character in end marker offset start";
+                goto end;
+              }
+              break;
+          }
+        }
+after_end_marker: // also end of function name
         // parse the arguments
         while (1) {
           if (function_token) {
@@ -411,6 +484,10 @@ end_of_function_name:
           }
         }
 end_of_function_parse:
+        if (function_token) {
+          function_token->data.function.end_marker.marker_number = marker_number;
+          function_token->data.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+        }
       } break;
     }
     ++arg->pos;
