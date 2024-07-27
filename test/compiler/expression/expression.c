@@ -372,5 +372,114 @@ int main(void) {
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].data.literal == (CODE_UNIT)0xaa);
   }
+  if (has_errors) return has_errors;
+
+  { // marker
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(tokens[0].data.function.name.begin == tokens[0].data.function.name.end);
+    assert_continue(tokens[0].data.function.begin_marker.marker_number == 0);
+    assert_continue(tokens[0].data.function.begin_marker.offset == 0);
+    assert_continue(tokens[0].data.function.begin_marker.present == true);
+  }
+
+  { // marker
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{512abc}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
+    assert_continue(tokens[0].data.function.begin_marker.offset == 0);
+    assert_continue(tokens[0].data.function.begin_marker.present == true);
+  }
+
+  { // marker number overflow
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{999999999999999999999999999999999999999999}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "overflow on marker begin value"));
+    assert_continue(cap.offset == 0);
+  }
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0-tester}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "marker offset must be non-empty if following sign"));
+    assert_continue(cap.offset == 3);
+  }
+
+  { // marker
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{512-3abc}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
+    assert_continue(tokens[0].data.function.begin_marker.offset == -3);
+    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(tokens[0].data.function.begin_marker.present == true);
+  }
+
+  { // marker
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{512+99abc}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 1);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
+    assert_continue(tokens[0].offset == 0);
+    assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
+    assert_continue(tokens[0].data.function.begin_marker.offset == 99);
+    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(tokens[0].data.function.begin_marker.present == true);
+  }
+
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0-999999999999999999999999999999999999999999tester}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "overflow on marker begin offset value"));
+    assert_continue(cap.offset == 0);
+  }
+
   return has_errors;
 }

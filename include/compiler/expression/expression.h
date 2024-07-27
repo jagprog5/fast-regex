@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "basic/ascii_int.h"
 #include "basic/likely_unlikely.h"
 #include "character/code_unit.h"
 
@@ -14,15 +15,10 @@ typedef struct {
 
 typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
 
-typedef enum {
-  EXPR_MARKER_NO, // no marker
-  EXPR_MARKER_YES
-} expr_marker_presence;
-
 typedef struct {
-  expr_marker_presence present; // other first are only applicable if present
-  uint32_t marker_number;       // which marker is this?
-  int offset;                   // placement of marker relative to beginning or end expression function
+  bool present;
+  uint32_t marker_number; // which marker is this?
+  int offset;             // placement of marker relative to beginning or end expression function
 } expr_marker;
 
 typedef struct {
@@ -291,17 +287,22 @@ past_hex_completion:
 
         if (function_token) {
           function_token->type = EXPR_TOKEN_FUNCTION;
-          function_token->data.function.name.begin = arg->pos + 1;
           function_token->data.function.num_args = 0;
           // init default function markers
-          function_token->data.function.begin_marker.present = EXPR_MARKER_NO;
-          function_token->data.function.begin_marker.marker_number = 0;
-          function_token->data.function.begin_marker.offset = 0;
-          function_token->data.function.end_marker.present = EXPR_MARKER_NO;
-          function_token->data.function.end_marker.marker_number = 0;
-          function_token->data.function.end_marker.offset = 0;
+          function_token->data.function.begin_marker.present = false;
+          function_token->data.function.end_marker.present = false;
         }
         // parse the function name and markers
+        enum {
+          MARKER_PARSE_PHASE_BEGIN_PARSING_ID, // must be at least one digit proceeding +-
+          MARKER_PARSE_PHASE_PARSING_ID,       // digits for the marker id (before +-)
+          MARKER_PARSE_PHASE_BEGIN_OFFSET,     // must be at least one digit after +-
+          MARKER_PARSE_PHASE_PARSING_OFFSET    // digits for offset (after +-)
+        } marker_parse_phase = MARKER_PARSE_PHASE_BEGIN_PARSING_ID;
+        bool offset_is_positive = true;
+        uint32_t marker_number = 0;
+        int marker_offset = 0;
+
         while (1) {
           ++arg->pos;
           if (unlikely(arg->pos == arg->end)) {
@@ -310,31 +311,66 @@ past_hex_completion:
             goto end;
           }
           ch = *arg->pos;
-          if (ch >= '0' && ch <= '9') {
-            // add to marker
-            uint32_t next_value = 10 * function_token->data.function.begin_marker.marker_number;
-            if (next_value / 10 != function_token->data.function.begin_marker.marker_number) {
-              goto handle_value_overflow;
-            }
-            function_token->data.function.begin_marker.marker_number = next_value;
 
-            { // checked add
-              uint32_t next_value = function_token->data.function.begin_marker.marker_number + (ch - '0');
-              if (next_value < function_token->data.function.begin_marker.marker_number) {
-handle_value_overflow:
+          switch (marker_parse_phase) {
+            case MARKER_PARSE_PHASE_BEGIN_PARSING_ID: {
+              // only digit allowed at beginning
+              if (ch >= '0' && ch <= '9') {
+                // overflow impossible on first digit
+                append_ascii_to_uint32(&marker_number, ch);
+                if (function_token) {
+                  function_token->data.function.begin_marker.present = true;
+                }
+              } else {
+                goto after_begin_marker; // any other character is part of the function name
+              }
+              marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID; // next phase
+            } break;
+            case MARKER_PARSE_PHASE_PARSING_ID: {
+              // digit or plus minus allows
+              if (ch == '-' || ch == '+') {
+                offset_is_positive = ch == '+';
+                marker_parse_phase = MARKER_PARSE_PHASE_BEGIN_OFFSET;
+              } else if (ch >= '0' && ch <= '9') {
+                if (!append_ascii_to_uint32(&marker_number, ch)) {
+                  ret.ret.offset = function_begin - arg->begin;
+                  ret.ret.reason = "overflow on marker begin value";
+                  goto end;
+                }
+              } else {
+                goto after_begin_marker;
+              }
+            } break;
+            case MARKER_PARSE_PHASE_BEGIN_OFFSET: {
+              if (ch >= '0' && ch <= '9') {
+                // overflow impossible on first digit
+                append_ascii_to_int(&marker_offset, ch);
+                marker_parse_phase = MARKER_PARSE_PHASE_PARSING_OFFSET;
+              } else {
                 ret.ret.offset = arg->pos - arg->begin;
-                ret.ret.reason = "begin marker too large";
+                ret.ret.reason = "marker offset must be non-empty if following sign";
                 goto end;
               }
-              function_token->data.function.begin_marker.marker_number = next_value;
-            }
-          } else {
-            // function name begin
-            break;
+            } break;
+            case MARKER_PARSE_PHASE_PARSING_OFFSET: {
+              if (ch >= '0' && ch <= '9') {
+                if (!append_ascii_to_int(&marker_offset, ch)) {
+                  ret.ret.offset = function_begin - arg->begin;
+                  ret.ret.reason = "overflow on marker begin offset value";
+                  goto end;
+                }
+              } else {
+                goto after_begin_marker;
+              }
+            } break;
           }
         }
-
-        // function name (after marker)
+after_begin_marker:
+        if (function_token) {
+          function_token->data.function.begin_marker.marker_number = marker_number;
+          function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->data.function.name.begin = arg->pos;
+        }
         while (1) {
           switch (ch) {
             case '}':
