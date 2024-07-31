@@ -3,6 +3,8 @@
 #include "character/subject_buffer.h"
 #include "compiler/expression/expression.h"
 
+// IN PROGRESS
+
 typedef enum {
   FUNCTION_SETUP_OK,
   FUNCTION_SETUP_ERR,
@@ -42,6 +44,12 @@ typedef struct {
   function_setup_value value;
 } function_setup_result;
 
+typedef enum {
+  MATCH_SUCCESS,
+  MATCH_FAILURE,
+  MATCH_INCOMPLETE // pcre2 partial hard - match is incomplete if it could be extended by more content
+} interpret_result;
+
 // typedef enum {
   // MATCHED
 // } interpret_result;
@@ -59,5 +67,6 @@ typedef struct function_definition {
 
   // this is the function used at runtime.
   // TODO more info from result
-  bool (*interpret)(subject_buffer_state* buffer);
+  interpret_result (*interpret)(subject_buffer_state* buffer);
 };
+

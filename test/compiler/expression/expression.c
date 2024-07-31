@@ -1,4 +1,8 @@
 #include <assert.h>
+#include <stdbool.h>
+
+#define TESTING_HOOK
+bool marker_increment_check = false;
 
 #include "compiler/expression/expression.h"
 
@@ -653,6 +657,57 @@ int main(void) {
     assert_continue(tokens[7].type == EXPR_TOKEN_ENDARG);
     assert_continue(tokens[8].type == EXPR_TOKEN_ENDARG);
   }
+
+  if (has_errors) return has_errors;
+
+  marker_increment_check = true;
+
+  { // needs marker 0 defined
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{1tester}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
+    assert_continue(cap.offset == 0);
+  }
+
+  { // ok
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0tester}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+  }
+
+  { // last marker listed not ok (missing marker 2)
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0tester}{1tester}{0tester}{3tester}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
+    assert_continue(cap.offset == 27);
+  }
+
+  { // needs marker 0 defined
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester1}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
+    assert_continue(cap.offset == 0);
+  }
+
+  { // ok
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester0}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+  }
+
+  { // last marker listed not ok (missing marker 2)
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester0}{tester1}{tester0}{tester3}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(0 == strcmp(cap.reason, "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
+    assert_continue(cap.offset == 27);
+  }
+
 
   return has_errors;
 }

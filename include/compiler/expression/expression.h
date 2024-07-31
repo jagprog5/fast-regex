@@ -58,6 +58,9 @@ typedef struct {
   //    in this case, the returned value is meaningless
   bool getting_capacity;
 
+  // the number of markers in the expression
+  size_t num_markers;
+
   // moves forward as the output is populated.
   // point to allocation on the second pass. null on first pass
   expr_token* out;
@@ -80,6 +83,7 @@ expr_tokenize_arg expr_tokenize_arg_init(const CODE_UNIT* begin, const CODE_UNIT
   ret.begin = begin;
   ret.end = end;
   ret.getting_capacity = true;
+  ret.num_markers = 0;
   ret.out = NULL;
   return ret;
 }
@@ -93,6 +97,7 @@ size_t expr_tokenize_arg_get_cap(const expr_tokenize_arg* arg) {
 void expr_tokenize_arg_set_to_fill(expr_tokenize_arg* arg, expr_token* out) {
   arg->pos = arg->begin;
   arg->getting_capacity = false;
+  arg->num_markers = 0;
   arg->out = out;
 }
 
@@ -136,6 +141,10 @@ static expr_token* reserve_in_output(expr_tokenize_arg* output) {
   ++output->out;
   return ret;
 }
+
+#ifdef TESTING_HOOK
+extern bool marker_increment_check; // used to disable a check during testing
+#endif
 
 // private
 expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* arg, bool top_level) {
@@ -288,9 +297,6 @@ past_hex_completion:
         if (function_token) {
           function_token->type = EXPR_TOKEN_FUNCTION;
           function_token->data.function.num_args = 0;
-          // init default function markers
-          function_token->data.function.begin_marker.present = false;
-          function_token->data.function.end_marker.present = false;
         }
         // parse the function name and markers
         enum {
@@ -302,6 +308,7 @@ past_hex_completion:
         bool offset_is_positive = true;
         uint32_t marker_number = 0;
         int marker_offset = 0;
+        bool marker_present = false;
 
         while (1) {
           ++arg->pos;
@@ -318,9 +325,7 @@ past_hex_completion:
               if (ch >= '0' && ch <= '9') {
                 // overflow impossible on first digit
                 append_ascii_to_uint32(&marker_number, ch);
-                if (function_token) {
-                  function_token->data.function.begin_marker.present = true;
-                }
+                marker_present = true;
               } else {
                 goto after_begin_marker; // any other character is part of the function name
               }
@@ -366,11 +371,33 @@ past_hex_completion:
           }
         }
 after_begin_marker:
+        if (marker_present) {
+#ifdef TESTING_HOOK
+          if (marker_increment_check) {
+#endif
+            if (marker_number > arg->num_markers) {
+              ret.ret.offset = function_begin - arg->begin;
+              ret.ret.reason = "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
+              goto end;
+            } else if (marker_number == arg->num_markers) {
+              arg->num_markers += 1;
+            }
+#ifdef TESTING_HOOK
+          }
+#endif
+        }
         if (function_token) {
           function_token->data.function.begin_marker.marker_number = marker_number;
           function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->data.function.begin_marker.present = marker_present;
           function_token->data.function.name.begin = arg->pos;
         }
+        // reset and reuse for end marker as well
+        marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID;
+        marker_number = 0;
+        marker_offset = 0;
+        offset_is_positive = true;
+        marker_present = false;
         // parsing the function name.
         // looking for }, ',', or a digit to signify the end of the function name
         while (1) {
@@ -390,13 +417,8 @@ after_begin_marker:
               if (ch >= '0' && ch <= '9') {
                 if (function_token) {
                   function_token->data.function.name.end = arg->pos;
-                  function_token->data.function.end_marker.present = true;
                 }
-                // reset and reuse for end marker as well
-                marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID;
-                marker_number = 0;
-                marker_offset = 0;
-                offset_is_positive = true;
+                marker_present = true;
                 append_ascii_to_uint32(&marker_number, ch);
                 goto before_end_marker;
               }
@@ -484,7 +506,23 @@ after_end_marker: // also end of function name
           }
         }
 end_of_function_parse:
+        if (marker_present) {
+#ifdef TESTING_HOOK
+          if (marker_increment_check) {
+#endif
+            if (marker_number > arg->num_markers) {
+              ret.ret.offset = function_begin - arg->begin;
+              ret.ret.reason = "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
+              goto end;
+            } else if (marker_number == arg->num_markers) {
+              arg->num_markers += 1;
+            }
+#ifdef TESTING_HOOK
+          }
+#endif
+        }
         if (function_token) {
+          function_token->data.function.end_marker.present = marker_present;
           function_token->data.function.end_marker.marker_number = marker_number;
           function_token->data.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
         }
