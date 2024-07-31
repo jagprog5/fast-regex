@@ -1,6 +1,4 @@
-#define USE_WCHAR
-
-#include "arithmetic_expression.h"
+#include "compiler/arithmetic_expression/arithmetic_expression.h"
 
 #include "test_common.h"
 extern int has_errors;
@@ -473,6 +471,22 @@ int main(void) {
     assert_continue(ret.type == ARITH_TOKENIZE_CAPACITY_ERROR);
     assert_continue(ret.value.err.offset == 11);
     assert_continue(0 == strcmp(ret.value.err.reason, "expecting end of literal"));
+  }
+  {
+    const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xFFFFFFFF'"); // largest
+    arith_token array_output[2];
+    memset(array_output, 0, sizeof(array_output));
+
+    arith_tokenize_capacity ret = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output);
+
+    assert_continue(array_output[0].type == ARITH_U32);
+    assert_continue(array_output[0].offset == 0);
+
+    assert_continue((CODE_UNIT)array_output[0].value.u32 == (CODE_UNIT)0xFFFFFFFF);
+
+    assert_continue(array_output[1].type == ARITH_INVALID);
+    assert_continue(array_output[1].offset == 0);
+    assert_continue(array_output[1].value.symbol_value_lookup == 0);
   }
   {
     const CODE_UNIT* expr = CODE_UNIT_LITERAL("'\\xQ'");

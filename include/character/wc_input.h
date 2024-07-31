@@ -50,11 +50,13 @@ convert_pattern_to_wchar_range_result convert_pattern_to_wchar_range(const char*
 }
 
 // intended for use in converting the subject text from a file before its use by the engine.
-// out must point to an allocation greater or equal in number of elements to the input.
-// the decode state, ps, must be retained between calls.
-// complete indicates that this is the last segment to decode from the input stream
-// returns the end of the output
-wchar_t* convert_subject_to_wchar_range(const char* begin, const char* end, bool complete, mbstate_t* ps, wchar_t* out) {
+// `out` must point to an allocation greater or equal in number of elements to the input.
+// the decode state, `ps`, must be retained between calls.
+// `complete` indicates that this is the last segment to decode from the input stream
+// `skip_invalid` indicates the behaviour of invalid bytes. if true, they are discarded.
+// if false, \\uFFFF is sent per invalid byte
+// returns the end of the output.
+wchar_t* convert_subject_to_wchar_range(const char* begin, const char* end, bool complete, mbstate_t* ps, wchar_t* out, bool skip_invalid) {
   assert(begin <= end);
   while (begin != end) {
     size_t num_bytes = mbrtowc(out, begin, end - begin, ps);
@@ -71,16 +73,18 @@ wchar_t* convert_subject_to_wchar_range(const char* begin, const char* end, bool
         // and by sending a noncharacter-FFFF to the output. it's important
         // that something is sent, otherwise characters that aren't adjacent will
         // appear so from the perspective of the pattern matching downstream
-        *out++ = L'\uFFFF';
+        if (!skip_invalid) *out++ = L'\uFFFF';
         begin += 1;
         memset(ps, 0, sizeof(*ps)); // make not unspecified
         break;
       case (size_t)-2:
         if (complete) {
           // represent n bytes of the incomplete multibyte with a noncharacter, each
-          while (begin != end) {
-            *out++ = L'\uFFFF';
-            begin += 1;
+          if (!skip_invalid) {
+            while (begin != end) {
+              *out++ = L'\uFFFF';
+              begin += 1;
+            }
           }
         } else {
           // incomplete multibyte.

@@ -1,7 +1,5 @@
-#define USE_WCHAR
-
-#include "arithmetic_expression_compile.h"
-#include "c_aot_compile.h"
+#include "compiler/arithmetic_expression/arithmetic_expression_compile.h"
+#include "compiler/c_aot_compile.h"
 
 #include "test_common.h"
 extern int has_errors;

@@ -1,8 +1,8 @@
+#pragma once
+
 /**
  * ahead of time compilation using c compiler. c source is compiled, then loaded
  */
-
-#pragma once
 
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -13,7 +13,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "likely_unlikely.hpp"
+#include "basic/likely_unlikely.h"
 
 // returns NULL on error - an appropriate error will have been printed to stderr
 // returns the dlopen handle for the compiled shared object.
@@ -158,11 +158,10 @@ void* compile(const char* c_compiler, const char* program_begin, const char* pro
 
     for (size_t i = 0; i < num_extra_args; ++i) {
       extra_args_arena_size += strlen(compiler_args[i]) + 1;
-
     }
 
     char extra_args_arena[extra_args_arena_size];
-    
+
     {
       char* extra_args_arena_walk = extra_args_arena;
       for (size_t i = 0; i < num_extra_args; ++i) {

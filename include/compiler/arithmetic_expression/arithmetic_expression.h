@@ -4,8 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "code_unit.h"
-#include "likely_unlikely.hpp"
+#include "basic/ascii_int.h"
+#include "basic/likely_unlikely.h"
+#include "character/code_unit.h"
 
 // ============================== arith_token ==================================
 
@@ -465,28 +466,12 @@ past_literal_close_quote:
             goto begin_iter;
           }
 
-          // handle digit
-          // token_value is a u32 proxy for token.value.u32
           uint32_t token_value = token.value.u32;
-
-          { // checked multiply
-            uint32_t next_value = 10 * token_value;
-            if (next_value / 10 != token_value) {
-              goto handle_value_overflow;
-            }
-            token_value = next_value;
-          }
-
-          { // checked add
-            uint32_t next_value = token_value + (ch - '0');
-            if (next_value < token_value) {
-handle_value_overflow:
-              ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
-              ret.value.err.reason = "num too large";
-              ret.value.err.offset = token.offset;
-              goto end;
-            }
-            token_value = next_value;
+          if (!append_ascii_to_uint32(&token_value, ch)) {
+            ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
+            ret.value.err.reason = "num too large";
+            ret.value.err.offset = token.offset;
+            goto end;
           }
           token.value.u32 = token_value;
           ++begin;

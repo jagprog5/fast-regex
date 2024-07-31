@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
-#include "c_aot_compile.h"
+
+#include "compiler/c_aot_compile.h"
 
 #ifndef COMPILER_USED
     #error "COMPILER_USED must be defined to the c compiler"

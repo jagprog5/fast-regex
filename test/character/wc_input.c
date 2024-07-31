@@ -1,6 +1,7 @@
-#include "input.h"
 #include <locale.h>
 #include <stdio.h>
+
+#include "character/wc_input.h"
 
 #include "test_common.h"
 extern int has_errors;
@@ -68,8 +69,8 @@ int main(void) {
     return has_errors;
   }
   { // empty input output
-    assert_continue(NULL == convert_subject_to_wchar_range(NULL, NULL, false, NULL, NULL));
-    assert_continue(NULL == convert_subject_to_wchar_range(NULL, NULL, true, NULL, NULL));
+    assert_continue(NULL == convert_subject_to_wchar_range(NULL, NULL, false, NULL, NULL, false));
+    assert_continue(NULL == convert_subject_to_wchar_range(NULL, NULL, true, NULL, NULL, false));
   }
   { // simple (including null)
     mbstate_t ps;
@@ -80,7 +81,7 @@ int main(void) {
     size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
     wchar_t output[expected_output_size];
     memset(output, 0, sizeof(output));
-    assert_continue(output + 3 == convert_subject_to_wchar_range(input, input + input_size, true, &ps, output));
+    assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, true, &ps, output, false));
     assert_continue(0 == memcmp(expected_output, output, expected_output_size));
   }
   { // retained state between calls
@@ -89,7 +90,7 @@ int main(void) {
     {
       const char input[] = {0xE2, 0x9C};
       size_t input_size = sizeof(input) / sizeof(*input);
-      assert_continue(NULL == convert_subject_to_wchar_range(input, input + input_size, false, &ps, NULL));
+      assert_continue(NULL == convert_subject_to_wchar_range(input, input + input_size, false, &ps, NULL, false));
     }
     {
       const char input[] = {0x93};
@@ -97,7 +98,7 @@ int main(void) {
       const wchar_t expected_output[] = {L'✓', 0};
       size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
       wchar_t output[expected_output_size];
-      assert_continue(output + 1 == convert_subject_to_wchar_range(input, input + input_size, false, &ps, output));
+      assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, false, &ps, output, false));
     }
   }
   { // decode error
@@ -109,7 +110,19 @@ int main(void) {
     size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
     wchar_t output[expected_output_size];
     memset(output, 0, sizeof(output));
-    assert_continue(output + 3 == convert_subject_to_wchar_range(input, input + input_size, false, &ps, output));
+    assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, false, &ps, output, false));
+    assert_continue(0 == memcmp(expected_output, output, expected_output_size));
+  }
+  { // decode error - skipped
+    mbstate_t ps;
+    memset(&ps, 0, sizeof(ps));
+    const char input[] = {0xFF, 0xFF, 'a'};
+    size_t input_size = sizeof(input) / sizeof(*input);
+    const wchar_t expected_output[] = {'a', 0};
+    size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
+    wchar_t output[expected_output_size];
+    memset(output, 0, sizeof(output));
+    assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, false, &ps, output, true));
     assert_continue(0 == memcmp(expected_output, output, expected_output_size));
   }
   { // incomplete multibyte at end of input
@@ -121,7 +134,19 @@ int main(void) {
     size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
     wchar_t output[expected_output_size];
     memset(output, 0, sizeof(output));
-    assert_continue(output + 2 == convert_subject_to_wchar_range(input, input + input_size, true, &ps, output));
+    assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, true, &ps, output, false));
+    assert_continue(0 == memcmp(expected_output, output, expected_output_size));
+  }
+  { // incomplete multibyte at end of input - skipped
+    mbstate_t ps;
+    memset(&ps, 0, sizeof(ps));
+    const char input[] = {0xE2, 0x9C};
+    size_t input_size = sizeof(input) / sizeof(*input);
+    const wchar_t expected_output[] = {0};
+    size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
+    wchar_t output[expected_output_size];
+    memset(output, 0, sizeof(output));
+    assert_continue(output + expected_output_size - 1 == convert_subject_to_wchar_range(input, input + input_size, true, &ps, output, true));
     assert_continue(0 == memcmp(expected_output, output, expected_output_size));
   }
   return has_errors;

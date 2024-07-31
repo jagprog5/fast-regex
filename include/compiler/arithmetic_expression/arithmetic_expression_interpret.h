@@ -1,6 +1,6 @@
 #pragma once
 
-#include "arithmetic_expression.h"
+#include "compiler/arithmetic_expression/arithmetic_expression.h"
 
 // values indicates the value taken on by each symbol in the expression, with
 // offset indicated by the same position in the allowed_symbols passed to

@@ -1,6 +1,4 @@
-#define USE_WCHAR
-
-#include "arithmetic_expression_interpret.h"
+#include "compiler/arithmetic_expression/arithmetic_expression_interpret.h"
 
 #include "test_common.h"
 extern int has_errors;
