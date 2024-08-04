@@ -354,6 +354,9 @@ simple_token:
               ret.value.err.offset = begin - original_begin;
               goto end;
               break;
+            case '0':
+              token.value.u32 = '\0';
+              break;
             case 'a':
               token.value.u32 = '\a';
               break;

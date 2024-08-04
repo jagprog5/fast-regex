@@ -1,9 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#define TESTING_HOOK
-bool marker_increment_check = false;
-
 #include "compiler/expression/expression.h"
 
 #include "test_common.h"
@@ -117,7 +114,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abcd")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abcd")));
     assert_continue(tokens[0].data.function.num_args == 0);
   }
   {
@@ -135,7 +132,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abcd")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abcd")));
     assert_continue(tokens[0].data.function.num_args == 1);
     assert_continue(tokens[1].type == EXPR_TOKEN_ENDARG);
   }
@@ -154,7 +151,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
     assert_continue(tokens[0].data.function.num_args == 1);
 
     assert_continue(tokens[1].offset == 4);
@@ -183,7 +180,7 @@ int main(void) {
 
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
     assert_continue(tokens[0].data.function.num_args == 1);
 
     assert_continue(tokens[1].offset == 4);
@@ -212,7 +209,7 @@ int main(void) {
 
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("ab")));
     assert_continue(tokens[0].data.function.num_args == 2);
 
     assert_continue(tokens[1].offset == 4);
@@ -266,7 +263,7 @@ int main(void) {
     assert_continue(tokens[4].data.literal == 't');
 
     assert_continue(tokens[5].type == EXPR_TOKEN_FUNCTION);
-    assert_continue(0 == code_unit_range_equal2(tokens[5].data.function.name.begin, tokens[5].data.function.name.end, CODE_UNIT_LITERAL("outer")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[5].data.function.name.begin, tokens[5].data.function.name.end, CODE_UNIT_LITERAL("outer")));
     assert_continue(tokens[5].data.function.num_args == 3);
 
     assert_continue(tokens[6].type == EXPR_TOKEN_LITERAL);
@@ -279,7 +276,7 @@ int main(void) {
 
     assert_continue(tokens[9].offset == 15);
     assert_continue(tokens[9].type == EXPR_TOKEN_FUNCTION);
-    assert_continue(0 == code_unit_range_equal2(tokens[9].data.function.name.begin, tokens[9].data.function.name.end, CODE_UNIT_LITERAL("inner")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[9].data.function.name.begin, tokens[9].data.function.name.end, CODE_UNIT_LITERAL("inner")));
     assert_continue(tokens[9].data.function.num_args == 1);
 
     assert_continue(tokens[10].offset == 22);
@@ -415,7 +412,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
     assert_continue(tokens[0].data.function.begin_marker.offset == 0);
     assert_continue(tokens[0].data.function.begin_marker.present == true);
@@ -454,7 +451,7 @@ int main(void) {
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
     assert_continue(tokens[0].data.function.begin_marker.offset == -3);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.begin_marker.present == true);
     assert_continue(tokens[0].data.function.end_marker.present == false);
   }
@@ -476,7 +473,7 @@ int main(void) {
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].data.function.begin_marker.marker_number == 512);
     assert_continue(tokens[0].data.function.begin_marker.offset == 99);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.begin_marker.present == true);
     assert_continue(tokens[0].data.function.end_marker.present == false);
   }
@@ -504,7 +501,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.end_marker.present == true);
     assert_continue(tokens[0].data.function.end_marker.marker_number == 512);
     assert_continue(tokens[0].data.function.end_marker.offset == 0);
@@ -566,7 +563,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.end_marker.present == true);
     assert_continue(tokens[0].data.function.end_marker.marker_number == 5);
     assert_continue(tokens[0].data.function.end_marker.offset == -3);
@@ -588,7 +585,7 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.end_marker.present == true);
     assert_continue(tokens[0].data.function.end_marker.marker_number == 5);
     assert_continue(tokens[0].data.function.end_marker.offset == 99);
@@ -618,14 +615,14 @@ int main(void) {
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
-    assert_continue(0 == code_unit_range_equal2(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[0].data.function.name.begin, tokens[0].data.function.name.end, CODE_UNIT_LITERAL("abc")));
     assert_continue(tokens[0].data.function.end_marker.present == false);
     assert_continue(tokens[0].data.function.begin_marker.present == false);
     assert_continue(tokens[0].data.function.num_args == 1);
 
     assert_continue(tokens[1].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[1].offset == 5);
-    assert_continue(0 == code_unit_range_equal2(tokens[1].data.function.name.begin, tokens[1].data.function.name.end, CODE_UNIT_LITERAL("str")));
+    assert_continue(0 == code_unit_range_equal_to_string(tokens[1].data.function.name.begin, tokens[1].data.function.name.end, CODE_UNIT_LITERAL("str")));
     assert_continue(tokens[1].data.function.begin_marker.present == true);
     assert_continue(tokens[1].data.function.begin_marker.marker_number == 0);
     assert_continue(tokens[1].data.function.begin_marker.offset == 2);

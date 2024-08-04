@@ -177,6 +177,9 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
           case '}':
             send_escaped_to_output(arg, ch);
             break;
+          case '0':
+            send_escaped_to_output(arg, '\0');
+            break;
           case 'a':
             send_escaped_to_output(arg, '\a');
             break;
