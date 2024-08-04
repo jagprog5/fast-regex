@@ -660,54 +660,96 @@ int main(void) {
 
   if (has_errors) return has_errors;
 
-  marker_increment_check = true;
-
-  { // needs marker 0 defined
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{1tester}");
-    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
-    expr_tokenize_result cap = tokenize_expression(&arg);
-    assert_continue(0 == strcmp(cap.reason, "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
-    assert_continue(cap.offset == 0);
-  }
-
-  { // ok
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0tester}");
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("");
     expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
     expr_tokenize_result cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 0);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
+    assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
+    assert_continue(low_check.value == 0);
   }
 
-  { // last marker listed not ok (missing marker 2)
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0tester}{1tester}{0tester}{3tester}");
-    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
-    expr_tokenize_result cap = tokenize_expression(&arg);
-    assert_continue(0 == strcmp(cap.reason, "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
-    assert_continue(cap.offset == 27);
-  }
-
-  { // needs marker 0 defined
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester1}");
-    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
-    expr_tokenize_result cap = tokenize_expression(&arg);
-    assert_continue(0 == strcmp(cap.reason, "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
-    assert_continue(cap.offset == 0);
-  }
-
-  { // ok
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester0}");
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0}{0}{0}{0}");
     expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
     expr_tokenize_result cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 4);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
+    assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
+    assert_continue(low_check.value == 1);
   }
 
-  { // last marker listed not ok (missing marker 2)
-    const CODE_UNIT* program = CODE_UNIT_LITERAL("{tester0}{tester1}{tester0}{tester3}");
+  { // err at {7} since there are 7 markers total, no way markers are lowest
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{3}{0}{2}{1}{5}{7}{6}");
     expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
     expr_tokenize_result cap = tokenize_expression(&arg);
-    assert_continue(0 == strcmp(cap.reason, "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker"));
-    assert_continue(cap.offset == 27);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 7);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
+    assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_ERR);
+    // printf("%lu\n", low_check,val)
+    assert_continue(low_check.value == 15);
   }
 
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{0}{0}{2}{0}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 4);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
+    assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_ERR);
+    assert_continue(low_check.value == 6);
+  }
+
+  {
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{3}{1}{2}{0}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    assert_continue(output_size == 4);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
+    assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
+    assert_continue(low_check.value == 4);
+  }
 
   return has_errors;
 }

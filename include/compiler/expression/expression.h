@@ -142,10 +142,6 @@ static expr_token* reserve_in_output(expr_tokenize_arg* output) {
   return ret;
 }
 
-#ifdef TESTING_HOOK
-extern bool marker_increment_check; // used to disable a check during testing
-#endif
-
 // private
 expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* arg, bool top_level) {
   assert(arg->pos <= arg->end);
@@ -371,21 +367,6 @@ past_hex_completion:
           }
         }
 after_begin_marker:
-        if (marker_present) {
-#ifdef TESTING_HOOK
-          if (marker_increment_check) {
-#endif
-            if (marker_number > arg->num_markers) {
-              ret.ret.offset = function_begin - arg->begin;
-              ret.ret.reason = "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
-              goto end;
-            } else if (marker_number == arg->num_markers) {
-              arg->num_markers += 1;
-            }
-#ifdef TESTING_HOOK
-          }
-#endif
-        }
         if (function_token) {
           function_token->data.function.begin_marker.marker_number = marker_number;
           function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
@@ -506,21 +487,6 @@ after_end_marker: // also end of function name
           }
         }
 end_of_function_parse:
-        if (marker_present) {
-#ifdef TESTING_HOOK
-          if (marker_increment_check) {
-#endif
-            if (marker_number > arg->num_markers) {
-              ret.ret.offset = function_begin - arg->begin;
-              ret.ret.reason = "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
-              goto end;
-            } else if (marker_number == arg->num_markers) {
-              arg->num_markers += 1;
-            }
-#ifdef TESTING_HOOK
-          }
-#endif
-        }
         if (function_token) {
           function_token->data.function.end_marker.present = marker_present;
           function_token->data.function.end_marker.marker_number = marker_number;
@@ -543,4 +509,99 @@ end:
 
 expr_tokenize_result tokenize_expression(expr_tokenize_arg* arg) {
   return tokenize_expression_internal(arg, true).ret;
+}
+
+typedef enum { EXPR_TOKEN_MARKERS_LOW_OK, EXPR_TOKEN_MARKERS_LOW_ERR } expr_token_marker_low_type;
+
+typedef struct {
+  expr_token_marker_low_type type;
+  // if OK, indicates the number of output markers
+  // if ERR, indicates the offending offset
+  size_t value;
+} expr_token_marker_low_result;
+
+// markers should be the lowest values possible
+expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr_token* const begin, const expr_token* const end) {
+  assert(begin <= end);
+
+  expr_token_marker_low_result ret;
+
+  size_t num_markers = 0;
+  const expr_token* pos = begin;
+  while (pos != end) {
+    expr_token t = *pos;
+    if (t.type == EXPR_TOKEN_FUNCTION) {
+      if (t.data.function.begin_marker.present) {
+        ++num_markers;
+      }
+
+      if (t.data.function.end_marker.present) {
+        ++num_markers;
+      }
+    }
+    ++pos;
+  }
+
+  pos = begin;
+
+  // in this array, using -1 to indicate marker was not seen,
+  // and other values indicates the offset where the marker was seen
+  size_t marker_seen[num_markers];
+  for (size_t i = 0; i < num_markers; ++i) {
+    marker_seen[i] = -1;
+  }
+  
+  while (pos != end) {
+    expr_token t = *pos;
+    if (t.type == EXPR_TOKEN_FUNCTION) {
+      if (t.data.function.begin_marker.present) {
+        size_t marker_number = t.data.function.begin_marker.marker_number;
+        size_t offset = t.offset;
+        if (marker_number >= num_markers) {
+          // this is both a bound check, additionally it's known early that this
+          // is invalid via pigeon hole principal
+          ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+          ret.value = offset;
+          return ret;
+        }
+        marker_seen[marker_number] = offset;
+      }
+
+      if (t.data.function.end_marker.present) {
+        size_t marker_number = t.data.function.end_marker.marker_number;
+        size_t offset = t.offset;
+        if (marker_number >= num_markers) {
+          ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+          ret.value = offset;
+          return ret;
+        }
+        marker_seen[marker_number] = offset;
+      }
+    }
+    ++pos;
+  }
+
+  size_t num_unique_markers = 0;
+
+  // marker numbers should be compacted to the lowest available numbers
+  bool no_more = false;
+  for (size_t i = 0; i < num_markers; ++i) {
+    if (no_more) {
+      if (marker_seen[i] != -1) {
+        ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+        ret.value = marker_seen[i];
+        return ret;
+      }
+    } else {
+      if (marker_seen[i] == -1) {
+        no_more = true;
+      } else {
+        num_unique_markers += 1;
+      }
+    }
+  }
+
+  ret.type = EXPR_TOKEN_MARKERS_LOW_OK;
+  ret.value = num_unique_markers;
+  return ret;
 }
