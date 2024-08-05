@@ -65,7 +65,6 @@ typedef struct {
   function_setup_result (*setup)(size_t num_args, const expr_token* arg_start, char* data);
 
   // this is the function used at runtime.
-  // TODO more info from result
   interpret_result (*interpret)(subject_buffer_state* buffer);
 } function_definition;
 
@@ -96,87 +95,192 @@ static const function_definition* function_definition_lookup(expr_token_string_r
   return NULL;
 }
 
-typedef enum { FUNCTION_INTERPRET_SETUP_OK, FUNCTION_INTERPRET_SETUP_ERR } interpret_setup_expression_result_type;
+size_t interpret_presetup_get_number_of_function_calls(const expr_token* begin, //
+                                                       const expr_token* const end) {
+  size_t ret = 0;
+  while (begin != end) {
+    if (begin++->type == EXPR_TOKEN_FUNCTION) ret += 1;
+  }
+}
 
-// TODO error string needs to be dynamically generated, should have two phase for that as well. error strings can be long
-typedef struct {
-  interpret_setup_expression_result_type type;
-  // fields are applicable if error
-  size_t offset; // offset within entire expression
-  // to get the error string, call
-  size_t error_string_size; // number of elements in buffer in next call to interpret_setup_expression, to get the error reason string
-} interpret_setup_expression_result;
+// typedef enum { FUNCTION_INTERPRET_SETUP_OK, FUNCTION_INTERPRET_SETUP_ERR } interpret_setup_expression_result_type;
+
+// typedef struct {
+//   size_t offset;       // offending location in the expression
+//   size_t err_msg_size; // size required to store error message (including null terminator)
+// } interpret_setup_expression_result_value_err;
+
+// typedef union {
+//   size_t data_size;                                // FUNCTION_INTERPRET_SETUP_OK
+//   interpret_setup_expression_result_value_err err; // FUNCTION_INTERPRET_SETUP_ERR
+// } interpret_setup_expression_result_value;
+
+// typedef struct {
+//   interpret_setup_expression_result_type type;
+//   interpret_setup_expression_result_value value;
+// } interpret_setup_expression_result;
+
+// typedef struct {
+//   char* data; // points to contiguous data from all the function setup results
+//   //
+// } interpret_setup_expression_arg_ok;
+
+typedef union {
+  char* data;               // FUNCTION_INTERPRET_SETUP_OK
+  CODE_UNIT* error_message; // FUNCTION_INTERPRET_SETUP_ERR
+} interpret_setup_expression_arg;
 
 // setup expression to be interpreted.
-// functions points to a number of function definitions. they must be sorted by function_definition_sort.
-// error_msg should be NULL on first pass. if there is an error, it should be non null and point to an allocation with size indicated by the returned value
-interpret_setup_expression_result interpret_setup_expression(const expr_token* begin, const expr_token* const end, size_t num_function, const function_definition* functions, CODE_UNIT* error_msg) {
+//
+// functions points to a number of function definitions. they must be sorted by
+// function_definition_sort.
+//
+// this function should be called in two passes. the first pass gets the output
+// capacity needed for the output, indicated by passing out as NULL. the size
+// and overall status is indicated in the returned value.
+//
+// the second pass fills the output capacity, and the return value can be
+// discarded.
+interpret_setup_expression_result interpret_setup_expression(const expr_token* const begin, //
+                                                             const expr_token* const end,
+                                                             size_t num_function,
+                                                             const function_definition* functions,
+                                                             interpret_setup_expression_arg output) {
   assert(begin <= end);
   interpret_setup_expression_result ret;
-  while (begin != end) {
-    expr_token token = *begin++;
+
+  size_t num_function_calls = 0;
+  const expr_token* pos = begin;
+
+  while (pos != end) {
+    if (pos++->type == EXPR_TOKEN_FUNCTION) num_function_calls += 1;
+  }
+
+  // stores info retrieved at the presetup stage, for the setup stage
+  struct function_presetup_information {
+    size_t function_data_size;
+    const function_definition* definition;
+    size_t num_args;
+    const expr_token* arg_start;
+  };
+
+  // size of data for each function call
+  struct function_presetup_information presetup_info[num_function_calls];
+  size_t presetup_info_index = 0;
+  // total function call size
+  size_t function_total_data_size = 0;
+
+  pos = begin; // reset
+
+  while (pos != end) {
+    expr_token token = *pos++;
 
     if (token.type == EXPR_TOKEN_LITERAL) {
     } else if (token.type == EXPR_TOKEN_ENDARG) {
       // return from function...
     } else { // EXPR_TOKEN_FUNCTION
       // check if function has been registered
-
       const function_definition* definition = function_definition_lookup(token.data.function.name, num_function, functions);
       if (unlikely(definition == NULL)) {
         ret.type = FUNCTION_INTERPRET_SETUP_ERR;
-        ret.offset = token.offset;
+        ret.value.err.offset = token.offset;
+        ret.value.err.err_msg_size = 0;
+
         const CODE_UNIT* msg_prefix = "function name not registered: ";
-        ret.error_string_size = 0;
-        if (!error_msg) {
-          ret.error_string_size += code_unit_strlen(msg_prefix);
+        if (!output.error_message) {
+          ret.value.err.err_msg_size += code_unit_strlen(msg_prefix);
           // yes, the error string can contain a null character (in the pattern, \0).
           // this will cut off the string when printing, but that's ok
-          ret.error_string_size += token.data.function.name.end - token.data.function.name.begin;
-          ret.error_string_size += 1; // for trailing null
+          ret.value.err.err_msg_size += token.data.function.name.end - token.data.function.name.begin;
+          ret.value.err.err_msg_size += 1; // for trailing null
         } else {
           while (1) {
             CODE_UNIT cu = *msg_prefix++;
             if (cu == '\0') break;
-            *error_msg++ = cu;
+            *output.error_message++ = cu;
           }
           const CODE_UNIT* pos = token.data.function.name.begin;
           while (pos != token.data.function.name.end) {
-            *error_msg++ = *pos++;
+            *output.error_message++ = *pos++;
           }
-          *error_msg++ = '\0';
+          *output.error_message++ = '\0';
         }
         return ret;
       }
 
-      function_presetup_result presetup_result = definition->presetup(token.data.function.num_args, begin);
+      function_presetup_result presetup_result = definition->presetup(token.data.function.num_args, pos);
       if (unlikely(presetup_result.type == FUNCTION_SETUP_ERR)) {
+        ret.type = FUNCTION_INTERPRET_SETUP_ERR;
+        ret.value.err.offset = token.offset;
+        ret.value.err.err_msg_size = 0;
+
         const CODE_UNIT* msg_prefix = "function presetup error: ";
-        ret.error_string_size = 0;
-        if (!error_msg) {
-          ret.error_string_size += code_unit_strlen(msg_prefix);
-          ret.error_string_size += strlen(presetup_result.value.err.reason);
-          ret.error_string_size += 1; // for trailing null
+        if (!output.error_message) {
+          ret.value.err.err_msg_size += code_unit_strlen(msg_prefix);
+          ret.value.err.err_msg_size += strlen(presetup_result.value.err.reason);
+          ret.value.err.err_msg_size += 1; // for trailing null
         } else {
           while (1) {
             CODE_UNIT cu = *msg_prefix++;
             if (cu == '\0') break;
-            *error_msg++ = cu;
+            *output.error_message++ = cu;
           }
           while (1) {
             char ch = *presetup_result.value.err.reason++;
             if (ch == '\0') break;
-            *error_msg++ = ch;
+            *output.error_message++ = ch;
           }
-          *error_msg++ = '\0';
+          *output.error_message++ = '\0';
         }
         return ret;
       }
 
       // presetup was successful (arguments ok)
-      size_t setup_data_size = presetup_result.value.ok.data_size_bytes;
-
-      
+      presetup_info[presetup_info_index].function_data_size = presetup_result.value.ok.data_size_bytes;
+      presetup_info[presetup_info_index].definition = definition;
+      presetup_info[presetup_info_index].num_args = token.data.function.num_args;
+      presetup_info[presetup_info_index].arg_start = pos;
+      ++presetup_info_index;
+      function_total_data_size += presetup_result.value.ok.data_size_bytes;
     }
   }
+
+  assert(presetup_info_index == num_function_calls); // bound check
+
+  presetup_info_index = 0;
+  char function_data[function_total_data_size];
+  char* function_data_ptr = function_data;
+
+  // at this point, presetup has been cimpleted on all the above functions
+  // if this is the first pass, this is done
+
+  while (presetup_info_index != num_function_calls) {
+    struct function_presetup_information info = presetup_info[presetup_info_index++];
+    function_setup_result result = info.definition->setup(info.num_args, info.arg_start, function_data_ptr);
+    if (unlikely(result.type == FUNCTION_SETUP_ERR)) {
+      const CODE_UNIT* msg_prefix = "function setup error: ";
+      ret.error_string_size = 0;
+      if (!error_msg) {
+        ret.error_string_size += code_unit_strlen(msg_prefix);
+        ret.error_string_size += strlen(result.value.err.reason);
+        ret.error_string_size += 1; // for trailing null
+      } else {
+        while (1) {
+          CODE_UNIT cu = *msg_prefix++;
+          if (cu == '\0') break;
+          *error_msg++ = cu;
+        }
+        while (1) {
+          char ch = *result.value.err.reason++;
+          if (ch == '\0') break;
+          *error_msg++ = ch;
+        }
+        *error_msg++ = '\0';
+      }
+      return ret;
+    }
+    function_data_ptr += info.function_data_size;
+  }
+
+  assert(function_data_ptr - function_data == function_total_data_size);
 }
