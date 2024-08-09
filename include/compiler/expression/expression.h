@@ -13,8 +13,6 @@ typedef struct {
   const CODE_UNIT* end;
 } expr_token_string_range;
 
-typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
-
 typedef struct {
   bool present;
   uint32_t marker_number; // which marker is this?
@@ -28,14 +26,14 @@ typedef struct {
   expr_marker end_marker;
 } expr_token_function_data;
 
-typedef union {
-  CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
-  expr_token_function_data function; // EXPR_TOKEN_FUNCTION
-} expr_token_data;
+typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
 
 typedef struct {
   expr_token_type type;
-  expr_token_data data;
+  union {
+    CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
+    expr_token_function_data function; // EXPR_TOKEN_FUNCTION
+  } data;
   size_t offset; // for diagnostic information
 } expr_token;
 
@@ -553,7 +551,7 @@ expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr
   for (size_t i = 0; i < num_markers; ++i) {
     marker_seen[i] = -1;
   }
-  
+
   while (pos != end) {
     expr_token t = *pos;
     if (t.type == EXPR_TOKEN_FUNCTION) {

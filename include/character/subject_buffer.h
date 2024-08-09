@@ -39,7 +39,6 @@ size_t fread_wrapper(void* ptr, size_t size, size_t nmemb, FILE* stream) {
 }
 #endif
 
-
 // the subject is the input to be processed by a pattern
 // this handles the state of that buffer.
 typedef struct {
@@ -75,6 +74,12 @@ typedef struct {
   // match offset within the subject buffer
   size_t offset;
 } subject_buffer_state;
+
+// the number of characters within the buffer that is after the match offset
+size_t subject_buffer_remaining_size(const subject_buffer_state* buf) {
+  assert(buf->size >= buf->offset);
+  return buf->size - buf->offset;
+}
 
 // this is the beginning of the subject segment
 CODE_UNIT* subject_buffer_start(subject_buffer_state* buf) {

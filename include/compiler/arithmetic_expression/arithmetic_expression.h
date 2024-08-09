@@ -21,7 +21,7 @@ typedef enum {
   ARITH_BITWISE_XOR = '^',
   ARITH_BITWISE_AND = '&',
   ARITH_BITWISE_OR = '|',
-  ARITH_EQUAL = '=',               // =
+  ARITH_EQUAL = '=', // =
   // enum value 0x80 ensure no conflict with above enum values (0x80 is after ascii range)
   ARITH_BITWISE_COMPLEMENT = 0x80, // only unary.
   ARITH_NOT_EQUAL,                 // !=
@@ -51,25 +51,22 @@ typedef struct {
 
 // ======================== arith_tokenize_capacity ======================
 
-typedef enum {
-  ARITH_TOKENIZE_FILL_ARRAY = 0, // second pass
-  ARITH_TOKENIZE_CAPACITY_ERROR, // first pass error
-  ARITH_TOKENIZE_CAPACITY_OK,    // first pass success
-} arith_tokenize_capacity_type;
-
 typedef struct {
-  size_t offset;
-  const char* reason;
-} arith_tokenize_capacity_error;
+  enum {
+    ARITH_TOKENIZE_FILL_ARRAY = 0, // second pass
+    ARITH_TOKENIZE_CAPACITY_ERROR, // first pass error
+    ARITH_TOKENIZE_CAPACITY_OK,    // first pass success
+  } type;
 
-typedef union {
-  size_t capacity;                   // ARITH_TOKENIZE_CAPACITY_OK
-  arith_tokenize_capacity_error err; // ARITH_TOKENIZE_CAPACITY_ERROR
-} arith_tokenize_capacity_value;
+  union {
+    size_t capacity; // ARITH_TOKENIZE_CAPACITY_OK
 
-typedef struct {
-  arith_tokenize_capacity_type type;
-  arith_tokenize_capacity_value value;
+    struct { // ARITH_TOKENIZE_CAPACITY_ERROR
+      size_t offset;
+      const char* reason;
+    } err;
+  } value;
+
 } arith_tokenize_capacity;
 
 // =========================== functions =======================================
