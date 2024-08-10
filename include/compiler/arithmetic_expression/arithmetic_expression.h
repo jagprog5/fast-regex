@@ -51,12 +51,14 @@ typedef struct {
 
 // ======================== arith_tokenize_capacity ======================
 
+typedef enum {
+  ARITH_TOKENIZE_FILL_ARRAY = 0, // second pass
+  ARITH_TOKENIZE_CAPACITY_ERROR, // first pass error
+  ARITH_TOKENIZE_CAPACITY_OK,    // first pass success
+} arith_tokenize_capacity_type;
+
 typedef struct {
-  enum {
-    ARITH_TOKENIZE_FILL_ARRAY = 0, // second pass
-    ARITH_TOKENIZE_CAPACITY_ERROR, // first pass error
-    ARITH_TOKENIZE_CAPACITY_OK,    // first pass success
-  } type;
+  arith_tokenize_capacity_type type;
 
   union {
     size_t capacity; // ARITH_TOKENIZE_CAPACITY_OK
@@ -515,7 +517,7 @@ past_literal_close_quote:
               } else {
                 ret.type = ARITH_TOKENIZE_CAPACITY_ERROR;
                 ret.value.err.reason = "invalid symbol";
-                ret.value.err.offset = begin - original_begin;
+                ret.value.err.offset = token.offset;
                 goto end;
               }
             }

@@ -33,7 +33,7 @@ typedef struct {
   union {
     CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
     expr_token_function_data function; // EXPR_TOKEN_FUNCTION
-  } data;
+  } value;
   size_t offset; // for diagnostic information
 } expr_token;
 
@@ -108,7 +108,7 @@ static void send_to_output(expr_tokenize_arg* output, expr_token token) {
 
 static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
   expr_token token;
-  token.data.literal = ch;
+  token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
   token.offset = output->pos - output->begin;
   send_to_output(output, token);
@@ -117,7 +117,7 @@ static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
 // offset points to character before
 static void send_escaped_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
   expr_token token;
-  token.data.literal = ch;
+  token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
   token.offset = (output->pos - output->begin) - 1;
   send_to_output(output, token);
@@ -267,7 +267,7 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
               goto end;
             }
 past_hex_completion:
-            token.data.literal = hex_value;
+            token.value.literal = hex_value;
             send_to_output(arg, token);
           } break;
         }
@@ -293,7 +293,7 @@ past_hex_completion:
 
         if (function_token) {
           function_token->type = EXPR_TOKEN_FUNCTION;
-          function_token->data.function.num_args = 0;
+          function_token->value.function.num_args = 0;
         }
         // parse the function name and markers
         enum {
@@ -369,10 +369,10 @@ past_hex_completion:
         }
 after_begin_marker:
         if (function_token) {
-          function_token->data.function.begin_marker.marker_number = marker_number;
-          function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
-          function_token->data.function.begin_marker.present = marker_present;
-          function_token->data.function.name.begin = arg->pos;
+          function_token->value.function.begin_marker.marker_number = marker_number;
+          function_token->value.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->value.function.begin_marker.present = marker_present;
+          function_token->value.function.name.begin = arg->pos;
         }
         // reset and reuse for end marker as well
         marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID;
@@ -387,7 +387,7 @@ after_begin_marker:
             case '}':
             case ',':
               if (function_token) {
-                function_token->data.function.name.end = arg->pos;
+                function_token->value.function.name.end = arg->pos;
               }
               if (ch == '}') {
                 goto end_of_function_parse; // {function_name}
@@ -398,7 +398,7 @@ after_begin_marker:
             default:
               if (ch >= '0' && ch <= '9') {
                 if (function_token) {
-                  function_token->data.function.name.end = arg->pos;
+                  function_token->value.function.name.end = arg->pos;
                 }
                 marker_present = true;
                 append_ascii_to_uint32(&marker_number, ch);
@@ -474,7 +474,7 @@ after_end_marker: // also end of function name
         // parse the arguments
         while (1) {
           if (function_token) {
-            function_token->data.function.num_args += 1;
+            function_token->value.function.num_args += 1;
           }
           ++arg->pos; // skip past the ','
           expr_tokenize_result_internal recurse = tokenize_expression_internal(arg, false);
@@ -489,9 +489,9 @@ after_end_marker: // also end of function name
         }
 end_of_function_parse:
         if (function_token) {
-          function_token->data.function.end_marker.present = marker_present;
-          function_token->data.function.end_marker.marker_number = marker_number;
-          function_token->data.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->value.function.end_marker.present = marker_present;
+          function_token->value.function.end_marker.marker_number = marker_number;
+          function_token->value.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
         }
       } break;
     }
@@ -532,11 +532,11 @@ expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr
   while (pos != end) {
     expr_token t = *pos;
     if (t.type == EXPR_TOKEN_FUNCTION) {
-      if (t.data.function.begin_marker.present) {
+      if (t.value.function.begin_marker.present) {
         ++num_markers;
       }
 
-      if (t.data.function.end_marker.present) {
+      if (t.value.function.end_marker.present) {
         ++num_markers;
       }
     }
@@ -555,8 +555,8 @@ expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr
   while (pos != end) {
     expr_token t = *pos;
     if (t.type == EXPR_TOKEN_FUNCTION) {
-      if (t.data.function.begin_marker.present) {
-        size_t marker_number = t.data.function.begin_marker.marker_number;
+      if (t.value.function.begin_marker.present) {
+        size_t marker_number = t.value.function.begin_marker.marker_number;
         size_t offset = t.offset;
         if (marker_number >= num_markers) {
           // this is both a bound check, additionally it's known early that this
@@ -568,8 +568,8 @@ expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr
         marker_seen[marker_number] = offset;
       }
 
-      if (t.data.function.end_marker.present) {
-        size_t marker_number = t.data.function.end_marker.marker_number;
+      if (t.value.function.end_marker.present) {
+        size_t marker_number = t.value.function.end_marker.marker_number;
         size_t offset = t.offset;
         if (marker_number >= num_markers) {
           ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
