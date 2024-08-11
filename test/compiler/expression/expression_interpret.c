@@ -1,5 +1,6 @@
 #include "compiler/expression/expression_interpret.h"
 #include "compiler/expression/expression_interpret_standardlib/arith.h"
+#include "compiler/expression/expression_interpret_standardlib/empty.h"
 
 #include "test_common.h"
 extern int has_errors;
@@ -102,7 +103,6 @@ int main() {
     assert_continue(0 == code_unit_strcmp(error_msg, msg));
     assert_continue(presetup_result.value.err.offset == 1);
   }
-
   { // presetup of function failed
     // this expression fails at the tokenization step (invalid symbol)
     const CODE_UNIT* program = CODE_UNIT_LITERAL("{arith, abc < 9}");
@@ -145,7 +145,6 @@ int main() {
     assert_continue(0 == code_unit_strcmp(error_msg, msg));
     assert_continue(presetup_result.value.err.offset == 8);
   }
-
   { // setup of function failed
     // this expression fails at the parse step
     const CODE_UNIT* program = CODE_UNIT_LITERAL("{arith, 0 * * 9}");
@@ -201,6 +200,48 @@ int main() {
     setup_arg_copy.error_msg_output = error_msg;
     interpret_setup(&setup_arg_copy);
     assert_continue(0 == code_unit_strcmp(error_msg, msg));
+  }
+  { // fails because arith can't contain nested functions
+    const CODE_UNIT* program = CODE_UNIT_LITERAL("{arith,'\\{' - {0}}");
+    expr_tokenize_arg arg = expr_tokenize_arg_init(program, program + code_unit_strlen(program));
+    expr_tokenize_result cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    size_t output_size = expr_tokenize_arg_get_cap(&arg);
+    expr_token tokens[output_size];
+    expr_tokenize_arg_set_to_fill(&arg, tokens);
+    cap = tokenize_expression(&arg);
+    assert_continue(cap.reason == NULL);
+    assert_continue(arg.out - tokens == output_size);
+
+    size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
+
+    function_setup_info presetup_info[num_function_calls];
+    interpret_presetup_arg presetup_arg;
+    presetup_arg.begin = tokens;
+    presetup_arg.end = tokens + output_size;
+    presetup_arg.error_msg_output = NULL;
+    function_definition definitions[3] = {
+      *function_definition_for_literal(),
+      *function_definition_for_arith(),
+      *function_definition_for_empty()
+    };
+    size_t num_functions = sizeof(definitions) / sizeof(*definitions);
+    function_definition_sort(definitions, num_functions);
+    presetup_arg.functions = definitions;
+    presetup_arg.num_function = num_functions;
+    presetup_arg.presetup_info_output = presetup_info;
+
+    interpret_presetup_arg presetup_arg_copy = presetup_arg;
+    interpret_presetup_result presetup_result = interpret_presetup(&presetup_arg);
+    assert_continue(presetup_result.success == false);
+    const CODE_UNIT* msg = CODE_UNIT_LITERAL("function presetup error (arith): this function doesn't support nesting");
+    assert_continue(presetup_result.value.err.size == code_unit_strlen(msg) + 1);
+
+    CODE_UNIT error_msg[presetup_result.value.err.size];
+    presetup_arg_copy.error_msg_output = error_msg;
+    interpret_presetup(&presetup_arg_copy);
+    assert_continue(0 == code_unit_strcmp(error_msg, msg));
+    assert_continue(presetup_result.value.err.offset == 14);
   }
 
   return has_errors;
