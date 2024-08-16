@@ -397,6 +397,7 @@ after_begin_marker:
               break;
             default:
               if (ch >= '0' && ch <= '9') {
+                // counts as MARKER_PARSE_PHASE_BEGIN_PARSING_ID
                 if (function_token) {
                   function_token->value.function.name.end = arg->pos;
                 }
@@ -436,7 +437,9 @@ before_end_marker:
             }
           }
           switch (marker_parse_phase) {
-            case MARKER_PARSE_PHASE_PARSING_ID:
+            default:
+              // handled above: MARKER_PARSE_PHASE_BEGIN_PARSING_ID
+              assert(marker_parse_phase == MARKER_PARSE_PHASE_PARSING_ID);
               // digit or plus minus allowed
               if (ch >= '0' && ch <= '9') {
                 if (!append_ascii_to_uint32(&marker_number, ch)) {
@@ -588,13 +591,13 @@ expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr
   bool no_more = false;
   for (size_t i = 0; i < num_markers; ++i) {
     if (no_more) {
-      if (marker_seen[i] != -1) {
+      if (marker_seen[i] != (size_t)-1) {
         ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
         ret.value = marker_seen[i];
         return ret;
       }
     } else {
-      if (marker_seen[i] == -1) {
+      if (marker_seen[i] == (size_t)-1) {
         no_more = true;
       } else {
         num_unique_markers += 1;

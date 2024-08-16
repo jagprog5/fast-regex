@@ -14,7 +14,7 @@ uint_fast32_t run_test(const CODE_UNIT* expr_begin, const CODE_UNIT* expr_end, a
   } array_output;
 
   // tokenize second pass, fill output tokens
-  { arith_tokenize_capacity ret = tokenize_arithmetic_expression(expr_begin, expr_end, array_output.tokens, allowed_symbols); }
+  tokenize_arithmetic_expression(expr_begin, expr_end, array_output.tokens, allowed_symbols);
 
   // ret depends on the lifetime of array_output.parsed
   arith_expr_result ret = parse_arithmetic_expression(array_output.tokens, array_output.tokens + cap.value.capacity, array_output.parsed);

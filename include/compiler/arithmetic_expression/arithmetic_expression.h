@@ -480,7 +480,7 @@ past_literal_close_quote:
         }
       } break;
       default: {
-        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z' || ch == '_')) {
+        if ((ch >= 'a' && ch <= 'z') || ((ch >= 'A' && ch <= 'Z') || ch == '_')) {
           arith_token token;
           token.type = ARITH_SYMBOL;
           token.offset = begin - original_begin;
@@ -496,7 +496,7 @@ past_literal_close_quote:
             if (begin == end) {
               // emit symbol, end of string reached
               size_t symbol_index = get_arith_expr_allowed_symbol_index(original_begin + token.offset, begin, allowed_symbols);
-              if (likely(symbol_index != -1)) {
+              if (likely(symbol_index != (size_t)-1)) {
                 token.value.symbol_value_lookup = symbol_index;
                 send_output(&output, &ret, token, &state);
               } else {
@@ -510,7 +510,7 @@ past_literal_close_quote:
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_')) {
               // emit symbol, end of symbol reached
               size_t symbol_index = get_arith_expr_allowed_symbol_index(original_begin + token.offset, begin, allowed_symbols);
-              if (symbol_index != -1) {
+              if (symbol_index != (size_t)-1) {
                 token.value.symbol_value_lookup = symbol_index;
                 send_output(&output, &ret, token, &state);
                 goto begin_iter;
@@ -688,6 +688,9 @@ arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* e
             case ARITH_UNARY_ADD:
             case ARITH_UNARY_SUB:
               stack_top.type *= -1; // unary was converted to binary op
+              break;
+            default:
+              break;
           }
           out->type = stack_top.type;
           out->value = stack_top.value;
@@ -736,6 +739,9 @@ arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* e
               case ARITH_UNARY_ADD:
               case ARITH_UNARY_SUB:
                 stack_top.type *= -1; // unary was converted to binary op
+                break;
+              default:
+                break;
             }
             out->type = stack_top.type;
             out->value = stack_top.value;
@@ -770,6 +776,8 @@ arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* e
       case ARITH_UNARY_SUB:
         stack_top.type *= -1; // unary was converted to binary op
         break;
+      default:
+        break;
     }
     out->type = stack_top.type;
     out->value = stack_top.value;
@@ -787,7 +795,7 @@ arith_expr_result parse_arithmetic_expression(arith_token* begin, arith_token* e
 
   assert(current_stack_size == 1);
   assert(ret.value.expr.begin < ret.value.expr.end);
-  assert(ret.value.expr.end - ret.value.expr.begin <= input_size);
+  assert((size_t)(ret.value.expr.end - ret.value.expr.begin) <= input_size);
 end:
   return ret;
 }

@@ -1,5 +1,6 @@
 #include "compiler/expression/expression_interpret.h"
 #include "compiler/expression/expression_interpret_standardlib/arith.h"
+#include "compiler/expression/expression_interpret_standardlib/str.h"
 #include "compiler/expression/expression_interpret_standardlib/empty.h"
 
 #include "test_common.h"
@@ -17,7 +18,7 @@ int main() {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
 
@@ -76,7 +77,7 @@ int main() {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
 
@@ -114,7 +115,7 @@ int main() {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
 
@@ -156,7 +157,7 @@ int main() {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
 
@@ -175,7 +176,6 @@ int main() {
     presetup_arg.num_function = num_functions;
     presetup_arg.presetup_info_output = presetup_info;
 
-    interpret_presetup_arg presetup_arg_copy = presetup_arg;
     interpret_presetup_result presetup_result = interpret_presetup(&presetup_arg);
     assert_continue(presetup_result.success);
 
@@ -193,7 +193,7 @@ int main() {
     assert_continue(setup_result.success == false);
     assert_continue(setup_result.value.err.offset == 10);
 
-    const CODE_UNIT* msg = "function setup error (arith): expression stack exhausted by op";
+    const CODE_UNIT* msg = CODE_UNIT_LITERAL("function setup error (arith): expression stack exhausted by op");
     assert_continue(setup_result.value.err.size == code_unit_strlen(msg) + 1);
 
     CODE_UNIT error_msg[setup_result.value.err.size];
@@ -211,7 +211,7 @@ int main() {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     size_t num_function_calls = interpret_presetup_get_number_of_function_calls(tokens, tokens + output_size);
 

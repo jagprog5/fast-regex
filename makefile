@@ -1,7 +1,11 @@
-CFLAGS := -std=c99
+CFLAGS := -std=c99 -Wall -Wextra
 
 ifneq ($(USE_WCHAR),)
-CFLAGS += -DUSE_WCHAR -Wall -Wextra
+CFLAGS += -DUSE_WCHAR
+endif
+
+ifneq ($(NDEBUG),)
+CFLAGS += -DNDEBUG
 endif
 
 # no heap
@@ -36,7 +40,7 @@ test: $(TEST_BINARIES)
 # base test compile
 build/test/%.o: test/%.c test/test_common.h include/%.h
 	mkdir -p -- $$(dirname '$@')
-	$(CC) -Itest -Iinclude -c $< -o $@ $(CFLAGS)
+	$(CC) -Itest -Iinclude -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE
 
 # base test link
 build/test/%: build/test/%.o
@@ -45,7 +49,7 @@ build/test/%: build/test/%.o
 # compilation test compile
 build/test/%_compile.o: test/%_compile.c test/test_common.h include/%_compile.h
 	mkdir -p -- $$(dirname '$@')
-	@#                                           VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+	@#                                                         VVVVVVVVVVVVVVVVVVVVV
 	$(CC) -Itest -Iinclude -c $< -o $@ $(CFLAGS) -D_GNU_SOURCE -DCOMPILER_USED=$(CC)
 
 # compilation test link

@@ -33,7 +33,7 @@ static function_presetup_result function_definition_for_empty_presetup(const exp
   return ret;
 }
 
-static function_setup_result function_definition_for_empty_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size_bytes) {
+static function_setup_result function_definition_for_empty_setup(const expr_token** function_start, const function_setup_info** presetup_info, void*, size_t) {
   function_setup_result ret;
   ret.success = true;
   ret.value.ok.max_lookbehind_characters = 0;
@@ -43,11 +43,11 @@ static function_setup_result function_definition_for_empty_setup(const expr_toke
   return ret;
 }
 
-static bool function_definition_for_empty_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
+static bool function_definition_for_empty_guaranteed_length_interpret(subject_buffer_state*, const void*, size_t) {
   return true;
 }
 
-static match_status function_definition_for_empty_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
+static match_status function_definition_for_empty_interpret(subject_buffer_state*, const void*, size_t) {
   return MATCH_SUCCESS;
 }
 
@@ -55,10 +55,11 @@ static match_status function_definition_for_empty_interpret(subject_buffer_state
 // an empty function name should be used for markers
 // {0}hello{1}
 const function_definition* function_definition_for_empty() {
-  static function_definition ret = {{NULL, NULL}, //
+  static function_definition ret = {{NULL, NULL}, // empty string
                                     function_definition_for_empty_presetup,
                                     function_definition_for_empty_setup,
+                                    function_definition_for_empty_interpret,
                                     function_definition_for_empty_guaranteed_length_interpret,
-                                    function_definition_for_empty_interpret};
+                                    NULL};
   return &ret;
 }

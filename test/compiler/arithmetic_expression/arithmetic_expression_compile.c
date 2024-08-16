@@ -53,7 +53,7 @@ return arith_out;\
     const char* compiler = XSTR(COMPILER_USED);
     void* dl_handle = compile_no_args(compiler, code, code_fill);
     assert_continue(dl_handle != NULL);
-    int (*evaluate_expr)(const uint_fast32_t*);
+    uint_fast32_t (*evaluate_expr)(const uint_fast32_t*);
     *(void**)(&evaluate_expr) = dlsym(dl_handle, "evaluate_expr");
     assert_continue(evaluate_expr != NULL);
     bool ret = evaluate_expr(symbol_values) == expected_result;

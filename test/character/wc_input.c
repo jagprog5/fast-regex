@@ -40,8 +40,6 @@ int main(void) {
   { // error from bad utf8
     const char input[] = {0xFF};
     size_t input_size = sizeof(input) / sizeof(*input);
-    const wchar_t expected_output[] = {L'\uFFFF', 0};
-    size_t expected_output_size = sizeof(expected_output) / sizeof(*expected_output);
     convert_pattern_to_wchar_range_result ret = convert_pattern_to_wchar_range(input, input + input_size, NULL);
     assert_continue(ret.type == CONVERT_PATTERN_WCHAR_ERROR);
     assert_continue(ret.value.offending_location == input);

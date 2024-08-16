@@ -31,8 +31,10 @@ convert_pattern_to_wchar_range_result convert_pattern_to_wchar_range(const char*
     size_t num_bytes = mbrtowc(out, begin, end - begin, &ps);
     switch (num_bytes) {
       case 0:
-        num_bytes = 1; // fallthrough with 1 character consumed
+        num_bytes = 1;
+        goto suppress_fallthrough_warn;
       default:
+suppress_fallthrough_warn:
         begin += num_bytes;
         out += 1;
         break;
@@ -63,7 +65,9 @@ wchar_t* convert_subject_to_wchar_range(const char* begin, const char* end, bool
     switch (num_bytes) {
       case 0:
         num_bytes = 1; // fallthrough with 1 character consumed
+        goto suppress_fallthrough_warn;
       default:
+suppress_fallthrough_warn:
         begin += num_bytes;
         out += 1;
         break;

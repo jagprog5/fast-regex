@@ -61,12 +61,17 @@ static uint_fast32_t log10_manual_u32(uint_fast32_t n) {
 }
 
 // get capacity needed to write n as ascii
-static size_t ascii_size(size_t n) {
+static size_t ascii_size_size_t(size_t n) {
   return log10_manual_size_t(n) + 1;
 }
 
+// get capacity needed to write n as ascii
+static size_t ascii_size_u32(size_t n) {
+  return log10_manual_u32(n) + 1;
+}
+
 void generate_code_size_t(char** output, size_t* dst, size_t n) {
-  size_t num_size = ascii_size(n);
+  size_t num_size = ascii_size_size_t(n);
   if (output == NULL) {
     *dst += num_size;
   } else {
@@ -79,7 +84,7 @@ void generate_code_size_t(char** output, size_t* dst, size_t n) {
 }
 
 void generate_code_uf32_t(char** output, size_t* dst, uint_fast32_t n) {
-  uint_fast32_t num_size = ascii_size(n);
+  uint_fast32_t num_size = ascii_size_u32(n);
   if (output == NULL) {
     *dst += num_size;
   } else {
@@ -103,7 +108,7 @@ void generate_code_uf32_t(char** output, size_t* dst, uint_fast32_t n) {
 //    dst must point to something already initialized
 //  - the second pass fills the allocation.
 //    this is represented with a non NULL output arg
-arith_compile_capacity generate_code_arithmetic_expression_block(char** output, size_t* dst, arith_expr expr) {
+void generate_code_arithmetic_expression_block(char** output, size_t* dst, arith_expr expr) {
   assert(expr.begin < expr.end); // empty not allowed. handled prior by parse_arithmetic_expression
 
   generate_code_char(output, dst, '{'); // open block

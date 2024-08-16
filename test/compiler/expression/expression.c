@@ -18,12 +18,12 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     for (size_t i = 0; i < output_size; ++i) {
       assert_continue(tokens[i].type == EXPR_TOKEN_LITERAL);
       assert_continue(tokens[i].offset == i);
-      assert_continue(tokens[i].value.literal == 'a' + i);
+      assert_continue(tokens[i].value.literal == CODE_UNIT_LITERAL('a') + (CODE_UNIT)i);
     }
   }
   {
@@ -51,7 +51,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
     assert_continue(tokens[0].value.literal == '\n');
@@ -92,7 +92,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -110,7 +110,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -128,7 +128,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -147,7 +147,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -176,7 +176,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
@@ -205,7 +205,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].offset == 0);
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
@@ -245,7 +245,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
     assert_continue(tokens[0].value.literal == 's');
@@ -350,7 +350,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
     assert_continue(tokens[0].offset == 0);
@@ -367,7 +367,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_LITERAL);
     assert_continue(tokens[0].offset == 0);
@@ -386,7 +386,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -408,7 +408,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -445,7 +445,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -467,7 +467,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -497,7 +497,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -559,7 +559,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -581,7 +581,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -611,7 +611,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     assert_continue(tokens[0].type == EXPR_TOKEN_FUNCTION);
     assert_continue(tokens[0].offset == 0);
@@ -668,7 +668,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
     assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
@@ -686,7 +686,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
     assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
@@ -704,7 +704,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
     assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_ERR);
@@ -723,7 +723,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
     assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_ERR);
@@ -741,7 +741,7 @@ int main(void) {
     expr_tokenize_arg_set_to_fill(&arg, tokens);
     cap = tokenize_expression(&arg);
     assert_continue(cap.reason == NULL);
-    assert_continue(arg.out - tokens == output_size);
+    assert_continue((size_t)(arg.out - tokens) == output_size);
 
     expr_token_marker_low_result low_check = tokenize_expression_check_markers_lowest(tokens, tokens + output_size);
     assert_continue(low_check.type == EXPR_TOKEN_MARKERS_LOW_OK);
