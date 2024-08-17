@@ -21,6 +21,10 @@ extern size_t fread_wrapper_data_size;
 extern size_t fread_wrapper(void* ptr, size_t size, size_t nmemb, FILE* stream) {
   assert(size == sizeof(char));
   assert(stream == NULL);
+  #ifdef NDEBUG
+    (void)(size);
+    (void)(stream);
+  #endif
   size_t num_bytes_to_give;
   if (nmemb > fread_wrapper_data_size) {
     // too many to give
@@ -38,7 +42,6 @@ size_t fread_wrapper(void* ptr, size_t size, size_t nmemb, FILE* stream) {
   return fread(ptr, size, nmemb, stream);
 }
 #endif
-
 
 // the subject is the input to be processed by a pattern
 // this handles the state of that buffer.
@@ -75,6 +78,12 @@ typedef struct {
   // match offset within the subject buffer
   size_t offset;
 } subject_buffer_state;
+
+// the number of characters within the buffer that is at or after the match offset
+size_t subject_buffer_remaining_size(const subject_buffer_state* buf) {
+  assert(buf->size >= buf->offset);
+  return buf->size - buf->offset;
+}
 
 // this is the beginning of the subject segment
 CODE_UNIT* subject_buffer_start(subject_buffer_state* buf) {
@@ -187,8 +196,12 @@ bool subject_buffer_shift_and_get_input(subject_buffer_state* buf) {
     // from the pattern (and the match size is bounded due to the nature of
     // expressions)
     assert(false);
-    // if NDEBUG, drop the contents and reset state
-    return subject_buffer_get_first_input(buf);
+
+    // desperate recovery for NDEBUG
+
+    // force the offset forward by the required amount
+    // to make region 1 non empty
+    buf->offset = buf->max_lookbehind + 1;
   }
 
   CODE_UNIT* move_src_begin = subject_buffer_offset(buf) - buf->max_lookbehind;
@@ -201,6 +214,7 @@ bool subject_buffer_shift_and_get_input(subject_buffer_state* buf) {
       move_dst_begin, //
       move_src_begin, //
       sizeof(CODE_UNIT) * num_characters);
+  assert(move_dst_begin < move_src_begin);
   size_t amount_moved_back = move_src_begin - move_dst_begin;
   buf->size -= amount_moved_back;
   buf->offset -= amount_moved_back;

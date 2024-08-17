@@ -477,7 +477,7 @@ int main(void) {
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
 
-    arith_tokenize_capacity ret = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output);
 
     assert_continue(array_output[0].type == ARITH_U32);
     assert_continue(array_output[0].offset == 0);
@@ -558,7 +558,7 @@ int main(void) {
     arith_token array_output[2];
     memset(array_output, 0, sizeof(array_output));
 
-    arith_tokenize_capacity ret = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output);
+    arith_tokenize_capacity ret = tokenize_arithmetic_expression(expr, expr + code_unit_strlen(expr), array_output, &allowed_symbols);
     assert_continue(ret.type == ARITH_TOKENIZE_CAPACITY_ERROR);
     assert_continue(ret.value.err.offset == 0);
     assert_continue(0 == strcmp(ret.value.err.reason, "invalid symbol"));
@@ -713,7 +713,7 @@ int main(void) {
       arith_token tokens[2];
       arith_parsed parsed[2];
     } array_output;
-    arith_tokenize_capacity ret_fill = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
 
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);
@@ -733,7 +733,7 @@ int main(void) {
       arith_token tokens[5];
       arith_parsed parsed[5];
     } array_output;
-    arith_tokenize_capacity ret_fill = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
 
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);
@@ -768,7 +768,7 @@ int main(void) {
       arith_token tokens[4];
       arith_parsed parsed[4];
     } array_output;
-    arith_tokenize_capacity ret_fill = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
 
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);
@@ -793,7 +793,7 @@ int main(void) {
       arith_token tokens[5];
       arith_parsed parsed[5];
     } array_output;
-    arith_tokenize_capacity ret_fill = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
 
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);
@@ -827,7 +827,7 @@ int main(void) {
       arith_token tokens[6];
       arith_parsed parsed[6];
     } array_output;
-    arith_tokenize_capacity ret_fill = token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
+    token_exp_no_sym(expr, expr + code_unit_strlen(expr), array_output.tokens);
 
     assert_continue(array_output.tokens[0].type == ARITH_U32);
     assert_continue(array_output.tokens[0].offset == 0);

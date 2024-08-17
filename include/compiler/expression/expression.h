@@ -13,8 +13,6 @@ typedef struct {
   const CODE_UNIT* end;
 } expr_token_string_range;
 
-typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
-
 typedef struct {
   bool present;
   uint32_t marker_number; // which marker is this?
@@ -28,14 +26,14 @@ typedef struct {
   expr_marker end_marker;
 } expr_token_function_data;
 
-typedef union {
-  CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
-  expr_token_function_data function; // EXPR_TOKEN_FUNCTION
-} expr_token_data;
+typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr_token_type;
 
 typedef struct {
   expr_token_type type;
-  expr_token_data data;
+  union {
+    CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
+    expr_token_function_data function; // EXPR_TOKEN_FUNCTION
+  } value;
   size_t offset; // for diagnostic information
 } expr_token;
 
@@ -110,7 +108,7 @@ static void send_to_output(expr_tokenize_arg* output, expr_token token) {
 
 static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
   expr_token token;
-  token.data.literal = ch;
+  token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
   token.offset = output->pos - output->begin;
   send_to_output(output, token);
@@ -119,7 +117,7 @@ static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
 // offset points to character before
 static void send_escaped_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
   expr_token token;
-  token.data.literal = ch;
+  token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
   token.offset = (output->pos - output->begin) - 1;
   send_to_output(output, token);
@@ -141,10 +139,6 @@ static expr_token* reserve_in_output(expr_tokenize_arg* output) {
   ++output->out;
   return ret;
 }
-
-#ifdef TESTING_HOOK
-extern bool marker_increment_check; // used to disable a check during testing
-#endif
 
 // private
 expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* arg, bool top_level) {
@@ -180,6 +174,9 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
           case ',':
           case '}':
             send_escaped_to_output(arg, ch);
+            break;
+          case '0':
+            send_escaped_to_output(arg, '\0');
             break;
           case 'a':
             send_escaped_to_output(arg, '\a');
@@ -270,7 +267,7 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
               goto end;
             }
 past_hex_completion:
-            token.data.literal = hex_value;
+            token.value.literal = hex_value;
             send_to_output(arg, token);
           } break;
         }
@@ -296,7 +293,7 @@ past_hex_completion:
 
         if (function_token) {
           function_token->type = EXPR_TOKEN_FUNCTION;
-          function_token->data.function.num_args = 0;
+          function_token->value.function.num_args = 0;
         }
         // parse the function name and markers
         enum {
@@ -371,26 +368,11 @@ past_hex_completion:
           }
         }
 after_begin_marker:
-        if (marker_present) {
-#ifdef TESTING_HOOK
-          if (marker_increment_check) {
-#endif
-            if (marker_number > arg->num_markers) {
-              ret.ret.offset = function_begin - arg->begin;
-              ret.ret.reason = "begin marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
-              goto end;
-            } else if (marker_number == arg->num_markers) {
-              arg->num_markers += 1;
-            }
-#ifdef TESTING_HOOK
-          }
-#endif
-        }
         if (function_token) {
-          function_token->data.function.begin_marker.marker_number = marker_number;
-          function_token->data.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
-          function_token->data.function.begin_marker.present = marker_present;
-          function_token->data.function.name.begin = arg->pos;
+          function_token->value.function.begin_marker.marker_number = marker_number;
+          function_token->value.function.begin_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->value.function.begin_marker.present = marker_present;
+          function_token->value.function.name.begin = arg->pos;
         }
         // reset and reuse for end marker as well
         marker_parse_phase = MARKER_PARSE_PHASE_PARSING_ID;
@@ -405,7 +387,7 @@ after_begin_marker:
             case '}':
             case ',':
               if (function_token) {
-                function_token->data.function.name.end = arg->pos;
+                function_token->value.function.name.end = arg->pos;
               }
               if (ch == '}') {
                 goto end_of_function_parse; // {function_name}
@@ -415,8 +397,9 @@ after_begin_marker:
               break;
             default:
               if (ch >= '0' && ch <= '9') {
+                // counts as MARKER_PARSE_PHASE_BEGIN_PARSING_ID
                 if (function_token) {
-                  function_token->data.function.name.end = arg->pos;
+                  function_token->value.function.name.end = arg->pos;
                 }
                 marker_present = true;
                 append_ascii_to_uint32(&marker_number, ch);
@@ -454,7 +437,9 @@ before_end_marker:
             }
           }
           switch (marker_parse_phase) {
-            case MARKER_PARSE_PHASE_PARSING_ID:
+            default:
+              // handled above: MARKER_PARSE_PHASE_BEGIN_PARSING_ID
+              assert(marker_parse_phase == MARKER_PARSE_PHASE_PARSING_ID);
               // digit or plus minus allowed
               if (ch >= '0' && ch <= '9') {
                 if (!append_ascii_to_uint32(&marker_number, ch)) {
@@ -492,7 +477,7 @@ after_end_marker: // also end of function name
         // parse the arguments
         while (1) {
           if (function_token) {
-            function_token->data.function.num_args += 1;
+            function_token->value.function.num_args += 1;
           }
           ++arg->pos; // skip past the ','
           expr_tokenize_result_internal recurse = tokenize_expression_internal(arg, false);
@@ -506,25 +491,10 @@ after_end_marker: // also end of function name
           }
         }
 end_of_function_parse:
-        if (marker_present) {
-#ifdef TESTING_HOOK
-          if (marker_increment_check) {
-#endif
-            if (marker_number > arg->num_markers) {
-              ret.ret.offset = function_begin - arg->begin;
-              ret.ret.reason = "end marker number didn't increment from previous. should start at 0 and increase by 1 for each marker";
-              goto end;
-            } else if (marker_number == arg->num_markers) {
-              arg->num_markers += 1;
-            }
-#ifdef TESTING_HOOK
-          }
-#endif
-        }
         if (function_token) {
-          function_token->data.function.end_marker.present = marker_present;
-          function_token->data.function.end_marker.marker_number = marker_number;
-          function_token->data.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
+          function_token->value.function.end_marker.present = marker_present;
+          function_token->value.function.end_marker.marker_number = marker_number;
+          function_token->value.function.end_marker.offset = marker_offset * (offset_is_positive ? 1 : -1);
         }
       } break;
     }
@@ -543,4 +513,99 @@ end:
 
 expr_tokenize_result tokenize_expression(expr_tokenize_arg* arg) {
   return tokenize_expression_internal(arg, true).ret;
+}
+
+typedef enum { EXPR_TOKEN_MARKERS_LOW_OK, EXPR_TOKEN_MARKERS_LOW_ERR } expr_token_marker_low_type;
+
+typedef struct {
+  expr_token_marker_low_type type;
+  // if OK, indicates the number of output markers
+  // if ERR, indicates the offending offset
+  size_t value;
+} expr_token_marker_low_result;
+
+// markers should be the lowest values possible
+expr_token_marker_low_result tokenize_expression_check_markers_lowest(const expr_token* const begin, const expr_token* const end) {
+  assert(begin <= end);
+
+  expr_token_marker_low_result ret;
+
+  size_t num_markers = 0;
+  const expr_token* pos = begin;
+  while (pos != end) {
+    expr_token t = *pos;
+    if (t.type == EXPR_TOKEN_FUNCTION) {
+      if (t.value.function.begin_marker.present) {
+        ++num_markers;
+      }
+
+      if (t.value.function.end_marker.present) {
+        ++num_markers;
+      }
+    }
+    ++pos;
+  }
+
+  pos = begin;
+
+  // in this array, using -1 to indicate marker was not seen,
+  // and other values indicates the offset where the marker was seen
+  size_t marker_seen[num_markers];
+  for (size_t i = 0; i < num_markers; ++i) {
+    marker_seen[i] = -1;
+  }
+
+  while (pos != end) {
+    expr_token t = *pos;
+    if (t.type == EXPR_TOKEN_FUNCTION) {
+      if (t.value.function.begin_marker.present) {
+        size_t marker_number = t.value.function.begin_marker.marker_number;
+        size_t offset = t.offset;
+        if (marker_number >= num_markers) {
+          // this is both a bound check, additionally it's known early that this
+          // is invalid via pigeon hole principal
+          ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+          ret.value = offset;
+          return ret;
+        }
+        marker_seen[marker_number] = offset;
+      }
+
+      if (t.value.function.end_marker.present) {
+        size_t marker_number = t.value.function.end_marker.marker_number;
+        size_t offset = t.offset;
+        if (marker_number >= num_markers) {
+          ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+          ret.value = offset;
+          return ret;
+        }
+        marker_seen[marker_number] = offset;
+      }
+    }
+    ++pos;
+  }
+
+  size_t num_unique_markers = 0;
+
+  // marker numbers should be compacted to the lowest available numbers
+  bool no_more = false;
+  for (size_t i = 0; i < num_markers; ++i) {
+    if (no_more) {
+      if (marker_seen[i] != (size_t)-1) {
+        ret.type = EXPR_TOKEN_MARKERS_LOW_ERR;
+        ret.value = marker_seen[i];
+        return ret;
+      }
+    } else {
+      if (marker_seen[i] == (size_t)-1) {
+        no_more = true;
+      } else {
+        num_unique_markers += 1;
+      }
+    }
+  }
+
+  ret.type = EXPR_TOKEN_MARKERS_LOW_OK;
+  ret.value = num_unique_markers;
+  return ret;
 }

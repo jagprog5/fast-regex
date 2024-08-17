@@ -50,7 +50,7 @@ void* compile(const char* c_compiler, const char* program_begin, const char* pro
   {
     int printf_result = snprintf(compile_output_file, //
                                  sizeof(compile_output_file), "/dev/fd/%d", code_fd);
-    if (unlikely(printf_result < 0 || printf_result >= sizeof(compile_output_file))) {
+    if (unlikely(printf_result < 0 || (unsigned long)printf_result >= sizeof(compile_output_file))) {
       fputs("format error", stderr);
       goto end;
     }
@@ -92,7 +92,7 @@ void* compile(const char* c_compiler, const char* program_begin, const char* pro
     {
       int printf_result = snprintf(compile_output_file_arg, //
                                    sizeof(compile_output_file_arg), "-o%s", compile_output_file);
-      if (unlikely(printf_result < 0 || printf_result >= sizeof(compile_output_file_arg))) {
+      if (unlikely(printf_result < 0 || (unsigned long)printf_result >= sizeof(compile_output_file_arg))) {
         fputs("format error", stderr);
         exit(EXIT_FAILURE); // in child process - exit now
       }

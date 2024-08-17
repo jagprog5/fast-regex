@@ -11,9 +11,9 @@ size_t fread_wrapper_data_size = 0;
 
 void set_data_to_read_next(const char* data) {
   size_t len = strlen(data);
-  assert(len <= sizeof(fread_wrapper_data) / sizeof(char));
+  assert(len <= sizeof(fread_wrapper_data_arr) / sizeof(*fread_wrapper_data));
   fread_wrapper_data_size = len;
-  memcpy(fread_wrapper_data, data, len * sizeof(char));
+  memcpy(fread_wrapper_data, data, len * sizeof(*fread_wrapper_data));
 }
 
 #include "character/subject_buffer.h"

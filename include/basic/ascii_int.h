@@ -1,7 +1,8 @@
 #pragma once
 
-#include "assert.h"
-#include "stdint.h"
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 
 // false on overflow, true otherwise
 bool append_ascii_to_uint32(uint32_t* value, char ch) {
@@ -26,14 +27,23 @@ bool append_ascii_to_uint32(uint32_t* value, char ch) {
 }
 
 // false on overflow. true otherwise
-//  - implementation limit of 10000 as largest value (good enough in context this is used)
-//  - only handles digits (no sign)
 bool append_ascii_to_int(int* value, char ch) {
-    assert(ch >= '0' && ch <= '9');
-    *value *= 10;
-    *value += (ch - '0');
-    if (*value > 10000) {
-        return false;
+  assert(ch >= '0' && ch <= '9');
+
+  { // checked multiply for signed type
+    if (*value > (INT_MAX / 10)) {
+      return false;
     }
-    return true;
+
+    *value *= 10;
+  }
+
+  { // checked add for signed type
+    if (*value > (INT_MAX - (ch - '0'))) {
+      return false;
+    }
+    *value += (ch - '0');
+  }
+
+  return true;
 }
