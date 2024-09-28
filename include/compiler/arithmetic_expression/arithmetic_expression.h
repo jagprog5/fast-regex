@@ -1,12 +1,13 @@
 #pragma once
 
 #include <assert.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <wchar.h>
 
 #include "basic/ascii_int.h"
 #include "basic/likely_unlikely.h"
-#include "character/code_unit.h"
 
 // ============================== arith_token ==================================
 
@@ -31,7 +32,7 @@ typedef enum {
   ARITH_GREATER_THAN,              // >
   ARITH_GREATER_THAN_EQUAL,        // >=
   ARITH_RIGHT_SHIFT,               // >>
-  ARITH_U32,                       // u32 is the max size of CODE_UNIT
+  ARITH_U32,                       // u32 is the max size of wchar_t
   ARITH_SYMBOL,
   ARITH_UNARY_ADD = -ARITH_ADD,
   ARITH_UNARY_SUB = -ARITH_SUB,
@@ -139,8 +140,8 @@ static void send_output_zero_before_unary(arith_token** output,
 }
 
 typedef struct {
-  const CODE_UNIT* begin;
-  const CODE_UNIT* end;
+  const wchar_t* begin;
+  const wchar_t* end;
 } arith_expr_symbol;
 
 typedef struct {
@@ -149,8 +150,8 @@ typedef struct {
 } arith_expr_allowed_symbols;
 
 // -1 if not in allowed symbols
-static size_t get_arith_expr_allowed_symbol_index(const CODE_UNIT* symbol_begin, //
-                                                  const CODE_UNIT* symbol_end,
+static size_t get_arith_expr_allowed_symbol_index(const wchar_t* symbol_begin, //
+                                                  const wchar_t* symbol_end,
                                                   const arith_expr_allowed_symbols* allowed) {
   for (size_t i = 0; i < allowed->size; ++i) {
     arith_expr_symbol allowed_symbol = allowed->symbols[i];
@@ -183,8 +184,8 @@ try_next_symbol:
 //    in this case, the returned value is meaningless
 // unary ops get an imaginary zero before them, so they are now binary ops instead.
 // symbols which aren't specified in `allowed_symbols` throw an error.
-arith_tokenize_capacity tokenize_arithmetic_expression(const CODE_UNIT* begin,
-                                                       const CODE_UNIT* end, //
+arith_tokenize_capacity tokenize_arithmetic_expression(const wchar_t* begin,
+                                                       const wchar_t* end, //
                                                        arith_token* output,
                                                        const arith_expr_allowed_symbols* allowed_symbols) {
   assert(begin <= end);
@@ -202,10 +203,10 @@ arith_tokenize_capacity tokenize_arithmetic_expression(const CODE_UNIT* begin,
     ret.type = ARITH_TOKENIZE_FILL_ARRAY; // intentional redundant
   }
 
-  const CODE_UNIT* const original_begin = begin; // for offset calculation
+  const wchar_t* const original_begin = begin; // for offset calculation
 
   while (begin != end) {
-    CODE_UNIT ch = *begin;
+    wchar_t ch = *begin;
     // begin_iter represents that ch was not consumed in the below parsing
 begin_iter:
     switch (ch) {

@@ -75,14 +75,14 @@ function_presetup_result function_definition_for_arith_presetup(const expr_token
     return ret;
   }
   
-  ret.value.data_size_bytes = sizeof(function_definition_arith_data) + cap.value.capacity * sizeof(arith_parsed);
-  (*presetup_info)->function_data_size = ret.value.data_size_bytes;
+  ret.value.data_size = sizeof(function_definition_arith_data) + cap.value.capacity * sizeof(arith_parsed);
+  (*presetup_info)->function_data_size = ret.value.data_size;
   (*presetup_info)++;
   (*function_start) = arg_end + 1;
   return ret;
 }
 
-static function_setup_result function_definition_for_arith_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size_bytes) {
+static function_setup_result function_definition_for_arith_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size) {
   function_setup_result ret;
   ret.success = true;
   ret.value.ok.max_size_characters = 1;
@@ -107,7 +107,7 @@ static function_setup_result function_definition_for_arith_setup(const expr_toke
     *arith_expression_text_ptr++ = arg_begin++->value.literal;
   }
 
-  size_t num_tokens = data_size_bytes - sizeof(function_definition_arith_data);
+  size_t num_tokens = data_size - sizeof(function_definition_arith_data);
   assert(num_tokens % sizeof(arith_parsed) == 0);
   num_tokens /= sizeof(arith_parsed);
 
@@ -134,26 +134,27 @@ static function_setup_result function_definition_for_arith_setup(const expr_toke
 static bool function_definition_for_arith_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t) {
   assert(subject_buffer_remaining_size(buffer) >= 1);
   const function_definition_arith_data* expr = (const function_definition_arith_data*)data;
-  uint_fast32_t character = subject_buffer_start(buffer)[buffer->offset++];
+  uint_fast32_t character = subject_buffer_begin(buffer)[buffer->offset++];
   return interpret_arithmetic_expression(expr->expr, &character);
 }
 
-static match_status function_definition_for_arith_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
+static match_status function_definition_for_arith_interpret(subject_buffer_state* buffer, const void* data, size_t data_size) {
   size_t characters_remaining = subject_buffer_remaining_size(buffer);
   if (characters_remaining < 1) {
     return MATCH_INCOMPLETE;
   }
-  bool success = function_definition_for_literal_guaranteed_length_interpret(buffer, data, data_size_bytes);
+  bool success = function_definition_for_literal_guaranteed_length_interpret(buffer, data, data_size);
   return success ? MATCH_SUCCESS : MATCH_FAILURE;
 }
 
-static match_status function_definition_for_arith_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t) {
+static match_status function_definition_for_arith_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t, const CODE_UNIT** success_begin_out) {
   const function_definition_arith_data* expr = (const function_definition_arith_data*)data;
 
-  while (buffer->offset != buffer->size) {
-    uint_fast32_t character = subject_buffer_start(buffer)[buffer->offset++];
+  while (buffer->offset != subject_buffer_size(buffer)) {
+    uint_fast32_t character = subject_buffer_begin(buffer)[buffer->offset++];
     bool result = interpret_arithmetic_expression(expr->expr, &character);
     if (result) {
+      *success_begin_out = (subject_buffer_begin(buffer) + buffer->offset) - 1; // undo prior increment
       return MATCH_SUCCESS;
     }
   }

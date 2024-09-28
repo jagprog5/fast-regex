@@ -3,6 +3,8 @@
 #include "character/subject_buffer.h"
 #include "compiler/expression/expression.h"
 
+#include "character/code_unit.h"
+
 #include <stdlib.h> // qsort
 
 // ========================= function definition ===============================
@@ -13,7 +15,7 @@
 typedef struct {
   bool success;
   union {
-    size_t data_size_bytes; // success
+    size_t data_size; // success
     struct {                // failure
       size_t offset;        // offending location relative to beginning of expression
       const char* reason;
@@ -28,8 +30,8 @@ typedef struct {
   bool success;
   union {
     struct { // success
-      size_t max_size_characters;
-      size_t max_lookbehind_characters;
+      size_t max_size; // SHOULD BE BYTE NOT CHARACTERS
+      size_t max_lookbehind;
     } ok;
     struct {         // failure
       size_t offset; // offending location relative to beginning of expression
@@ -65,7 +67,7 @@ typedef struct function_definition {
   // this phase must do parsing and overall setup
   //
   // move function_start and presetup_info forward in the same way as the presetup
-  function_setup_result (*setup)(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size_bytes);
+  function_setup_result (*setup)(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size);
 
   // search for a match that starts at the buffer's match offset
   //
@@ -80,7 +82,7 @@ typedef struct function_definition {
   //  - INCOMPLETE : don't move the offset
   //  - SUCCESS : move the offset forward to one character past the matched content
   //  - FAILURE : (doesn't matter) 
-  match_status (*interpret)(subject_buffer_state* buffer, const void* data, size_t data_size_bytes);
+  match_status (*interpret)(subject_buffer_state* buffer, const void* data, size_t data_size);
 
   // search for a match that starts at the buffer's match offset
   //
@@ -94,26 +96,31 @@ typedef struct function_definition {
   // the function must move the subject buffer's offset depending on the result:
   //  - SUCCESS : move the offset forward to one character past the matched content
   //  - FAILURE : (doesn't matter) 
-  bool (*guaranteed_length_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size_bytes);
+  bool (*guaranteed_length_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size);
 
   // search for a match anywhere in the buffer
   //
   // this is called for an expression element that is at the beginning of the pattern.
   // there is no previously matched element to build off of
   //
-  // this function pointer should be NULL for elements which don't match any content (like comments)
-  //
   // return INCOMPLETE if a match could be completed or extended with additional content
   // otherwise, return SUCCESS on successful match, and FAILURE on no match.
   //
   // the function must move the subject buffer's offset depending on the result:
   //  - INCOMPLETE : move to the beginning of the incomplete match
-  //  - SUCCESS : move the offset forward to one character past the matched content
+  //  - SUCCESS : move the offset forward to one character past the matched content, and set success_offset to the beginning of the match
   //  - FAILURE : move to the end of the match buffer (buffer->size)
-  match_status (*entrypoint_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size_bytes);
+  match_status (*entrypoint_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size, size_t* success_offset);
 } function_definition;
 
 // ===================== definition for literal function (built in) ============
+
+// both STR and literal should be built in
+// they will have common functionality
+
+// the presetup should allow a specialization.
+// it should give yield the setup function to use next.
+// short string vs long string implementation
 
 static function_presetup_result function_definition_for_literal_presetup(const expr_token** function_start, function_setup_info** presetup_info) {
   // literal function is special because it doesn't need to validate its arguments.
@@ -121,8 +128,21 @@ static function_presetup_result function_definition_for_literal_presetup(const e
   assert((*function_start)->type == EXPR_TOKEN_LITERAL);
   function_presetup_result ret;
   ret.success = true;
-  ret.value.data_size_bytes = sizeof(CODE_UNIT);
-  (*presetup_info)->function_data_size = sizeof(CODE_UNIT);
+
+  wchar_t character = (*function_start)->value.literal;
+  if (character >= 0x80) {
+    
+  }
+  // if ()
+
+  // char mb_buf[MB_CUR_MAX];
+  // mbstate_t ps;
+  // memset(&ps, 0, sizeof(ps));
+  // size_t num_bytes = wcrtomb(mb_buf, (*function_start)->value.literal, &ps);
+  // assert(num_bytes > 0 && num_bytes <= MB_CUR_MAX);
+
+  ret.value.data_size = num_bytes;
+  (*presetup_info)->function_data_size = num_bytes;
   (*presetup_info)->num_args = 0;
   (*presetup_info)->function_start = *function_start;
   (*presetup_info)++;
@@ -130,52 +150,69 @@ static function_presetup_result function_definition_for_literal_presetup(const e
   return ret;
 }
 
-static function_setup_result function_definition_for_literal_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size_bytes) {
+static function_setup_result function_definition_for_literal_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size) {
   assert((*function_start)->type == EXPR_TOKEN_LITERAL);
   function_setup_result ret;
   ret.success = true;
-  ret.value.ok.max_lookbehind_characters = 0;
-  ret.value.ok.max_size_characters = 1;
-  assert(data_size_bytes == sizeof(CODE_UNIT));
+  ret.value.ok.max_lookbehind = 0;
+  ret.value.ok.max_size = 1;
+
+  mbstate_t ps;
+  memset(&ps, 0, sizeof(ps));
+  size_t num_bytes = wcrtomb(data, (*function_start)->value.literal, &ps);
+  assert(num_bytes = data_size);
   #ifdef NDEBUG
-    (void)(data_size_bytes);
+    (void)(data_size);
+    (void)(num_bytes);
   #endif
-  *(CODE_UNIT*)data = (*function_start)->value.literal;
+
   (*presetup_info)++;
   (*function_start)++;
   return ret;
 }
 
-static bool function_definition_for_literal_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
-  assert(data_size_bytes == sizeof(CODE_UNIT));
-  #ifdef NDEBUG
-    (void)(data_size_bytes);
-  #endif
-  assert(subject_buffer_remaining_size(buffer) >= 1);
-  return subject_buffer_start(buffer)[buffer->offset++] == *(const CODE_UNIT*)data;
+static bool function_definition_for_literal_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t data_size) {
+  bool result;
+  char* subject = buffer->subject_buffer + buffer->offset;
+  char* target = (char*)data;
+  if (likely(data_size == 1)) {
+    result = *subject == *target;
+  } else {
+    result = 0 == memcmp(subject, target, data_size);
+  }
+
+  buffer->offset += data_size;
+  return result;
 }
 
-static match_status function_definition_for_literal_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
-  size_t characters_remaining = subject_buffer_remaining_size(buffer);
-  if (characters_remaining < 1) {
-    return MATCH_INCOMPLETE;
+static match_status function_definition_for_literal_interpret(subject_buffer_state* buffer, const void* data, size_t data_size) {
+  size_t remaining_size = subject_buffer_remaining_size(buffer);
+  if (unlikely(remaining_size < data_size)) {
+    char* subject = buffer->subject_buffer + buffer->offset;
+    size_t subject_size = remaining_size;
+    char* target = (char*)data;
+    size_t target_size = data_size;
+    bool ends_with_incomplete = NULL != mem_incomplete_suffix(subject, subject_size, target, target_size);
+    return ends_with_incomplete ? MATCH_INCOMPLETE : MATCH_FAILURE;
   }
-  bool success = function_definition_for_literal_guaranteed_length_interpret(buffer, data, data_size_bytes);
+
+  bool success = function_definition_for_literal_guaranteed_length_interpret(buffer, data, data_size);
   return success ? MATCH_SUCCESS : MATCH_FAILURE;
 }
 
-static match_status function_definition_for_literal_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
-  assert(data_size_bytes == sizeof(CODE_UNIT));
-  #ifdef NDEBUG
-    (void)(data_size_bytes);
-  #endif
+static match_status function_definition_for_literal_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t data_size, const CODE_UNIT** success_begin_out) {
+  // assert(data_size == sizeof(CODE_UNIT));
+  // #ifdef NDEBUG
+  //   (void)(data_size);
+  // #endif
   CODE_UNIT find = *((const CODE_UNIT*)data);
-  const CODE_UNIT* ptr = code_unit_memchr(subject_buffer_offset(buffer), find, subject_buffer_remaining_size(buffer));
+  const CODE_UNIT* ptr = code_unit_memchr(subject_buffer_begin(buffer) + buffer->offset, find, subject_buffer_remaining_size(buffer));
   if (ptr == NULL) {
-    buffer->offset = buffer->size;
+    buffer->offset = subject_buffer_size(buffer);
     return MATCH_FAILURE;
   } else {
-    buffer->offset = (ptr - subject_buffer_start(buffer)) + 1;
+    *success_begin_out = ptr;
+    buffer->offset = (ptr - subject_buffer_begin(buffer)) + 1;
     return MATCH_SUCCESS;
   }
 }
@@ -192,43 +229,6 @@ const function_definition* function_definition_for_literal() {
 }
 
 // =============== helper functions ===============
-
-// wrapper, providing abstraction which reduces complexity of defined entrypoint function
-// if true is returned, the entrypoint successfully matched, and the offset points one after the match
-// false otherwise
-static bool entrypoint_interpret_wrapper(subject_buffer_state* buffer, //
-                                         const void* data,
-                                         size_t data_size_bytes,
-                                         match_status (*entrypoint_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size_bytes)) {
-  while (1) {
-    size_t offset_before = buffer->offset;
-    match_status result = entrypoint_interpret(buffer, data, data_size_bytes);
-    // assertions
-    if (result == MATCH_SUCCESS) {
-      assert(buffer->offset >= offset_before); // must have been moved to end of match
-    } else if (result == MATCH_FAILURE) {
-      assert(buffer->offset == buffer->size); // moved to end of buffer
-    } else if (result == MATCH_INCOMPLETE) {
-      assert(offset_before == buffer->offset); // shouldn't have moved
-    }
-    #ifdef NDEBUG
-      (void)(offset_before);
-    #endif
-
-    if (result == MATCH_SUCCESS) {
-      return true;
-    }
-
-    bool input_complete = subject_buffer_shift_and_get_input(buffer); // get more input
-    if (likely(!input_complete)) {
-      continue; // more input has been received. try again to find a match
-    }
-
-    // no more input. this is the last segment to find a match in
-    result = entrypoint_interpret(buffer, data, data_size_bytes);
-    return result == MATCH_SUCCESS;
-  }
-}
 
 static int function_definition_sort_comp(const void* lhs_arg, const void* rhs_arg) {
   const function_definition* lhs = (const function_definition*)lhs_arg;
@@ -267,7 +267,7 @@ typedef struct {
   bool success;
 
   union {
-    size_t data_size_bytes;
+    size_t data_size;
     struct {
       size_t offset;
       size_t size; // the number of characters in the output error message
@@ -276,7 +276,7 @@ typedef struct {
 } interpret_presetup_result;
 
 // needed prior to interpret_presetup
-size_t interpret_presetup_get_number_of_function_calls(const expr_token* begin, //
+size_t interpret_presetup_get_size(const expr_token* begin, //
                                                        const expr_token* const end) {
   size_t ret = 0;
   while (begin < end) {
@@ -289,7 +289,7 @@ size_t interpret_presetup_get_number_of_function_calls(const expr_token* begin, 
 //
 // functions points to num_function defined functions, sorted by function_definition_sort
 //
-// presetup_info_output points to n elements (interpret_presetup_get_number_of_function_calls)
+// presetup_info_output points to n elements (interpret_presetup_get_size)
 //
 // on first pass, error_msg_output should be null. if the return value indicates a failure,
 // then it should be called again, pointing to an appropriate number of elements (indicated in return value);
@@ -306,7 +306,7 @@ typedef struct {
 interpret_presetup_result interpret_presetup(interpret_presetup_arg* arg) {
   assert(arg->begin <= arg->end);
   interpret_presetup_result ret;
-  ret.value.data_size_bytes = 0;
+  ret.value.data_size = 0;
 
   while (arg->begin != arg->end) {
     assert(arg->begin < arg->end);
@@ -394,7 +394,7 @@ interpret_presetup_result interpret_presetup(interpret_presetup_arg* arg) {
       (void)(begin_before_call);
     #endif
 
-    ret.value.data_size_bytes += presetup_result.value.data_size_bytes;
+    ret.value.data_size += presetup_result.value.data_size;
   }
 
   ret.success = true;
@@ -408,8 +408,8 @@ typedef struct {
 
   union {
     struct {
-      size_t max_size_characters;
-      size_t max_lookbehind_characters;
+      size_t max_size;
+      size_t max_lookbehind;
     } ok;
     struct {
       size_t size;   // msg. number of elements
@@ -436,8 +436,8 @@ typedef struct {
 
 interpret_setup_result interpret_setup(interpret_setup_arg* arg) {
   interpret_setup_result ret;
-  ret.value.ok.max_lookbehind_characters = 0;
-  ret.value.ok.max_size_characters = 0;
+  ret.value.ok.max_lookbehind = 0;
+  ret.value.ok.max_size = 0;
   while (arg->begin != arg->end) {
     assert(arg->begin < arg->end);
     expr_token token = *arg->begin;
@@ -493,9 +493,121 @@ interpret_setup_result interpret_setup(interpret_setup_arg* arg) {
 
     arg->data = (char*)arg->data + data_size;
 
-    ret.value.ok.max_size_characters += result.value.ok.max_size_characters;
-    ret.value.ok.max_lookbehind_characters += result.value.ok.max_lookbehind_characters;
+    ret.value.ok.max_size += result.value.ok.max_size;
+    ret.value.ok.max_lookbehind += result.value.ok.max_lookbehind;
   }
   ret.success = true;
   return ret;
 }
+
+// // ========================== interpret ========================================
+
+// // wrapper, providing abstraction which reduces complexity of defined entrypoint function.
+// // (shifts the buffer - searching all content for entrypoint match)
+// // returns beginning of successful match, and the offset points to one after the match content.
+// // NULL otherwise
+// static const CODE_UNIT* entrypoint_interpret_wrapper(subject_buffer_state* buffer, //
+//                                          const void* data,
+//                                          size_t data_size,
+//                                          match_status (*entrypoint_interpret)(subject_buffer_state* buffer, const void* data, size_t data_size, const CODE_UNIT** success_begin_out)) {
+//   while (1) {
+//     size_t offset_before = buffer->offset;
+//     const CODE_UNIT* match_begin;
+//     match_status result = entrypoint_interpret(buffer, data, data_size, &match_begin);
+//     // assertions
+//     if (result == MATCH_SUCCESS) {
+//       assert(buffer->offset >= offset_before); // must have been moved to end of match
+//     } else if (result == MATCH_FAILURE) {
+//       assert(buffer->offset == buffer->size); // moved to end of buffer
+//     } else if (result == MATCH_INCOMPLETE) {
+//       assert(offset_before == buffer->offset); // shouldn't have moved
+//     }
+//     #ifdef NDEBUG
+//       (void)(offset_before);
+//     #endif
+
+//     if (result == MATCH_SUCCESS) {
+//       return match_begin;
+//     }
+
+//     bool input_complete = subject_buffer_shift_and_get_input(buffer); // get more input
+//     if (likely(!input_complete)) {
+//       continue; // more input has been received. try again to find a match
+//     }
+
+//     // no more input. this is the last segment to find a match in
+//     const CODE_UNIT* match_begin;
+//     result = entrypoint_interpret(buffer, data, data_size, &match_begin);
+//     if (result == MATCH_SUCCESS) {
+//       return match_begin;
+//     } else {
+//       return NULL;
+//     }
+//   }
+// }
+
+// // fields should be populated from interpret_setup
+// typedef struct {
+//   size_t max_size;
+//   size_t max_lookbehind;
+//   function_setup_info* expr;
+//   size_t expr_size;
+//   const void* data;
+//   size_t data_size;
+// } expression_interpret_arg;
+
+// bool expression_interpret(subject_buffer_state* buffer, expression_interpret_arg expr) {
+//   const CODE_UNIT* entrypoint_begin;
+//   while (1) {
+//     if (expr.expr_size == 0) {
+//       // niche case where expression is empty.
+//       // empty expressions count as a match failure (but perhaps should be undefined)
+//       return false;
+//     }
+
+//     function_setup_info setup_info = *expr.expr++;
+//     expr.expr_size -= 1;
+//     match_status (*entrypoint)(subject_buffer_state* buffer, const void* data, size_t data_size) = setup_info.definition->entrypoint_interpret;
+//     if (entrypoint == NULL) {
+//       // move onto next, for cases where the first elements are comments or otherwise don't match
+//       continue;
+//     }
+
+//     entrypoint_begin = entrypoint_interpret_wrapper(buffer, expr.data, expr.data_size, entrypoint);
+//     if (entrypoint_begin == NULL) {
+//       // entire file was scanned. no entrypoint match
+//       return false;
+//     }
+
+//     // entrypoint matched
+//     break;
+//   }
+
+//   // at this point the entrypoint has been found.
+//   // for matches near the beginning of the entire pattern.
+//   // the backward guaranteed length isn't satisfied
+
+//   //
+//   // bool bound_guaranteed;
+
+//   // // do a bound check over the entire expression
+//   // size_t consumed_so_far = entrypoint_begin - subject_buffer_begin(buffer);
+//   // assert(consumed_so_far <= buffer->size);
+//   // size_t remaining_size = buffer->size - consumed_so_far;
+//   // if (remaining_size >= ) {
+
+//   // }
+
+//   // bound_guaranteed = (entrypoint_begin - subject_buffer_begin(buffer)) - subjec
+
+//   // // at this point the entrypoint matched at a certain point. walk through the rest of the expression
+//   // while (1) {
+//   //   if (expr_size == 0) {
+//   //     // if there is no other part of the expression, then the entire expresion has been matched
+//   //     return true;
+//   //   }
+
+//   //   function_setup_info setup_info = *expr++;
+
+//   // }
+// }

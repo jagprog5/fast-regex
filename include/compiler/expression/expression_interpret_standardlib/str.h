@@ -39,18 +39,18 @@ function_presetup_result function_definition_for_str_presetup(const expr_token**
     arg_end += 1;
   }
 
-  ret.value.data_size_bytes = (arg_end - arg_begin) * sizeof(CODE_UNIT);
-  (*presetup_info)->function_data_size = ret.value.data_size_bytes;
+  ret.value.data_size = (arg_end - arg_begin) * sizeof(CODE_UNIT);
+  (*presetup_info)->function_data_size = ret.value.data_size;
   (*presetup_info)++;
   (*function_start) = arg_end + 1;
   return ret;
 }
 
-static function_setup_result function_definition_for_str_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size_bytes) {
+static function_setup_result function_definition_for_str_setup(const expr_token** function_start, const function_setup_info** presetup_info, void* data, size_t data_size) {
   function_setup_result ret;
   ret.success = true;
-  assert(data_size_bytes % sizeof(CODE_UNIT) == 0);
-  ret.value.ok.max_size_characters = data_size_bytes / sizeof(CODE_UNIT);
+  assert(data_size % sizeof(CODE_UNIT) == 0);
+  ret.value.ok.max_size_characters = data_size / sizeof(CODE_UNIT);
   ret.value.ok.max_lookbehind_characters = 0;
 
   assert((*function_start)->type == EXPR_TOKEN_FUNCTION);
@@ -65,42 +65,43 @@ static function_setup_result function_definition_for_str_setup(const expr_token*
   return ret;
 }
 
-static bool function_definition_for_str_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
+static bool function_definition_for_str_guaranteed_length_interpret(subject_buffer_state* buffer, const void* data, size_t data_size) {
   const CODE_UNIT* needle = data;
-  size_t needle_len = data_size_bytes / sizeof(CODE_UNIT); // number of elements
+  size_t needle_len = data_size / sizeof(CODE_UNIT); // number of elements
   assert(subject_buffer_remaining_size(buffer) >= needle_len);
-  bool ret = code_unit_memcmp(subject_buffer_offset(buffer), needle, needle_len);
+  bool ret = code_unit_memcmp(subject_buffer_begin(buffer) + buffer->offset, needle, needle_len);
   buffer->offset += needle_len;
   return ret;
 }
 
-static match_status function_definition_for_str_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
+static match_status function_definition_for_str_interpret(subject_buffer_state* buffer, const void* data, size_t data_size) {
   size_t characters_remaining = subject_buffer_remaining_size(buffer);
-  size_t needle_len = data_size_bytes / sizeof(CODE_UNIT); // number of elements
+  size_t needle_len = data_size / sizeof(CODE_UNIT); // number of elements
   if (characters_remaining < needle_len) {
     return MATCH_INCOMPLETE;
   }
-  bool success = function_definition_for_str_guaranteed_length_interpret(buffer, data, data_size_bytes);
+  bool success = function_definition_for_str_guaranteed_length_interpret(buffer, data, data_size);
   return success ? MATCH_SUCCESS : MATCH_FAILURE;
 }
 
-static match_status function_definition_for_str_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t data_size_bytes) {
-  const CODE_UNIT* haystack = subject_buffer_start(buffer) + buffer->offset;
+static match_status function_definition_for_str_entrypoint_interpret(subject_buffer_state* buffer, const void* data, size_t data_size, const CODE_UNIT** success_begin_out) {
+  const CODE_UNIT* haystack = subject_buffer_begin(buffer) + buffer->offset;
   size_t haystack_len = subject_buffer_remaining_size(buffer); // number of elements
   const CODE_UNIT* needle = data;
-  size_t needle_len = data_size_bytes / sizeof(CODE_UNIT); // number of elements
+  size_t needle_len = data_size / sizeof(CODE_UNIT); // number of elements
   const CODE_UNIT* result = code_unit_memmem(haystack, haystack_len, needle, needle_len);
   if (result != NULL) {
-    buffer->offset = (result - subject_buffer_start(buffer)) + needle_len;
+    *success_begin_out = result;
+    buffer->offset = (result - subject_buffer_begin(buffer)) + needle_len;
     return MATCH_SUCCESS;
   }
 
   result = code_unit_incomplete_suffix(haystack, haystack_len, needle, needle_len);
   if (result == NULL) {
-    buffer->offset = buffer->size;
+    buffer->offset = subject_buffer_size(buffer);
     return MATCH_FAILURE;
   } else {
-    buffer->offset = (result - subject_buffer_start(buffer));
+    buffer->offset = (result - subject_buffer_begin(buffer));
     return MATCH_INCOMPLETE;
   }
 }

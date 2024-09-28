@@ -3,6 +3,10 @@
 #include "test_common.h"
 extern int has_errors;
 
+// in this file, memset typically used to zero out an output buffer.
+// 1 more element that is needed was allocated, and should remain zero after being populated
+// (this is as a bound check, but really valgrind should be checking all of this anyways)
+
 // helper for testing
 arith_tokenize_capacity token_exp_no_sym(const CODE_UNIT* begin, //
                                          const CODE_UNIT* end,

@@ -1,28 +1,51 @@
-CFLAGS := -std=c99 -Wall -Wextra
+CFLAGS:=-std=c99 -Wall -Wextra
 
-ifneq ($(USE_WCHAR),)
-CFLAGS += -DUSE_WCHAR
+# arg or env provided to make
+USE_WCHAR:=
+NDEBUG:=
+
+# apply it to CFLAGS if set
+ifeq ($(USE_WCHAR),1)
+  CFLAGS+=-DUSE_WCHAR
+else ifeq ($(USE_WCHAR),t)
+  CFLAGS+=-DUSE_WCHAR
+else ifeq ($(USE_WCHAR),true)
+  CFLAGS+=-DUSE_WCHAR
+else ifeq ($(USE_WCHAR),T)
+  CFLAGS+=-DUSE_WCHAR
+else ifeq ($(USE_WCHAR),TRUE)
+  CFLAGS+=-DUSE_WCHAR
 endif
 
-ifneq ($(NDEBUG),)
-CFLAGS += -DNDEBUG
+ifeq ($(NDEBUG),1)
+  CFLAGS+=-DNDEBUG
+else ifeq ($(NDEBUG),t)
+  CFLAGS+=-DNDEBUG
+else ifeq ($(NDEBUG),true)
+  CFLAGS+=-DNDEBUG
+else ifeq ($(NDEBUG),T)
+  CFLAGS+=-DNDEBUG
+else ifeq ($(NDEBUG),TRUE)
+  CFLAGS+=-DNDEBUG
 endif
 
 # no heap
-LDFLAGS =-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free
+LDFLAGS=-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free
 
-TEST_SOURCES := $(shell find test -type f -name '*.c')
-TEST_OBJS := $(patsubst test/%.c,build/test/%.o,$(TEST_SOURCES))
-TEST_BINARIES := $(patsubst test/%.c,build/test/%,$(TEST_SOURCES))
+TEST_SOURCES:=$(shell find test -type f -name '*.c')
+TEST_OBJS:=$(patsubst test/%.c,build/test/%.o,$(TEST_SOURCES))
+TEST_BINARIES:=$(patsubst test/%.c,build/test/%,$(TEST_SOURCES))
 
 .PHONY: all debug test clean
 
 # MAIN BINARY
 
-all: CFLAGS += -O3 -DNDEBUG
+# default does optimization and no debug info
+all: CFLAGS+=-O2 -DNDEBUG
 all: build/regex
 
-debug: CFLAGS += -O0 -g
+# debug default has debug info and no optimization
+debug: CFLAGS+=-O0 -g
 debug: build/regex
 
 build/regex: build/main.o
@@ -33,7 +56,7 @@ build/main.o: src/main.c
 
 # TEST SUITE
 
-test: CFLAGS += -O0 -g
+test: CFLAGS+=-O0 -g
 test: $(TEST_BINARIES)
 	test/run_tests.sh
 

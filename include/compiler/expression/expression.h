@@ -3,20 +3,21 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <wchar.h>
 
 #include "basic/ascii_int.h"
 #include "basic/likely_unlikely.h"
-#include "character/code_unit.h"
 
 typedef struct {
-  const CODE_UNIT* begin;
-  const CODE_UNIT* end;
+  const wchar_t* begin;
+  const wchar_t* end;
 } expr_token_string_range;
 
 typedef struct {
   bool present;
-  uint32_t marker_number; // which marker is this?
-  int offset;             // placement of marker relative to beginning or end expression function
+  uint32_t marker_number;
+  int offset;
 } expr_marker;
 
 typedef struct {
@@ -31,7 +32,7 @@ typedef enum { EXPR_TOKEN_LITERAL, EXPR_TOKEN_FUNCTION, EXPR_TOKEN_ENDARG } expr
 typedef struct {
   expr_token_type type;
   union {
-    CODE_UNIT literal;                 // EXPR_TOKEN_LITERAL
+    wchar_t literal;                 // EXPR_TOKEN_LITERAL
     expr_token_function_data function; // EXPR_TOKEN_FUNCTION
   } value;
   size_t offset; // for diagnostic information
@@ -45,9 +46,9 @@ typedef struct {
 // this is the argument passed to tokenize_expression.
 // a reference is shared with recursive calls (global within top level call)
 typedef struct {
-  const CODE_UNIT* pos;   // current parse position. starts at begin and moved forward
-  const CODE_UNIT* begin; // beginning of the input range
-  const CODE_UNIT* end;   // end of the input range
+  const wchar_t* pos;   // current parse position. starts at begin and moved forward
+  const wchar_t* begin; // beginning of the input range
+  const wchar_t* end;   // end of the input range
 
   // use of the function should be complete in two passes.
   //  - the first pass gets the capacity required to store the array of tokens.
@@ -69,12 +70,12 @@ typedef struct {
   // ret propagates errors to the top level call
   expr_tokenize_result ret;
 
-  // true iff last argument was parsed.
+  // true only when last argument was parsed.
   bool function_complete;
 } expr_tokenize_result_internal;
 
 // initialize for the first pass
-expr_tokenize_arg expr_tokenize_arg_init(const CODE_UNIT* begin, const CODE_UNIT* end) {
+expr_tokenize_arg expr_tokenize_arg_init(const wchar_t* begin, const wchar_t* end) {
   assert(begin <= end);
   expr_tokenize_arg ret;
   ret.pos = begin;
@@ -106,7 +107,7 @@ static void send_to_output(expr_tokenize_arg* output, expr_token token) {
   ++output->out;
 }
 
-static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
+static void send_literal_to_output(expr_tokenize_arg* output, wchar_t ch) {
   expr_token token;
   token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
@@ -115,7 +116,7 @@ static void send_literal_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
 }
 
 // offset points to character before
-static void send_escaped_to_output(expr_tokenize_arg* output, CODE_UNIT ch) {
+static void send_escaped_to_output(expr_tokenize_arg* output, wchar_t ch) {
   expr_token token;
   token.value.literal = ch;
   token.type = EXPR_TOKEN_LITERAL;
@@ -149,7 +150,7 @@ expr_tokenize_result_internal tokenize_expression_internal(expr_tokenize_arg* ar
   ret.ret.reason = NULL;
 
   while (arg->pos != arg->end) {
-    CODE_UNIT ch = *arg->pos;
+    wchar_t ch = *arg->pos;
     switch (ch) {
       default:
         send_literal_to_output(arg, ch); // most characters are matched literally
@@ -288,7 +289,7 @@ past_hex_completion:
       } break;
       case '{': {
         // function call
-        const CODE_UNIT* const function_begin = arg->pos; // for offset calculation
+        const wchar_t* const function_begin = arg->pos; // for offset calculation
         expr_token* function_token = reserve_in_output(arg);
 
         if (function_token) {

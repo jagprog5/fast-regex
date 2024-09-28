@@ -24,7 +24,7 @@ static function_presetup_result function_definition_for_empty_presetup(const exp
     return ret;
   }
 
-  ret.value.data_size_bytes = 0;
+  ret.value.data_size = 0;
   (*presetup_info)->function_data_size = 0;
   (*presetup_info)->num_args = 0;
   (*presetup_info)->function_start = *function_start;
